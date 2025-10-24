@@ -1,781 +1,1561 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>HS Code Classifier - AI-Powered Classification</title>
-    <style>
-        :root {
-            --bg-primary: #0a0f1e;
-            --bg-secondary: #111827;
-            --bg-card: rgba(255, 255, 255, 0.04);
-            --text-primary: #f9fafb;
-            --text-secondary: #9ca3af;
-            --text-muted: #6b7280;
-            --accent-primary: #2563eb;
-            --accent-secondary: #1d4ed8;
-            --border: rgba(255, 255, 255, 0.08);
-            --border-strong: rgba(255, 255, 255, 0.15);
-            --shadow: rgba(0, 0, 0, 0.4);
-            --shadow-lg: rgba(0, 0, 0, 0.6);
-            --success: #059669;
-            --success-bg: rgba(5, 150, 105, 0.1);
-            --warning: #d97706;
-            --warning-bg: rgba(217, 119, 6, 0.1);
-            --error: #dc2626;
-            --error-bg: rgba(220, 38, 38, 0.1);
-            --conf-low: #ef4444;
-            --conf-mid: #f59e0b;
-            --conf-high: #10b981;
-        }
-
-        [data-theme="light"] {
-            --bg-primary: #f8fafc;
-            --bg-secondary: #ffffff;
-            --bg-card: #ffffff;
-            --text-primary: #0f172a;
-            --text-secondary: #475569;
-            --text-muted: #94a3b8;
-            --border: rgba(15, 23, 42, 0.1);
-            --border-strong: rgba(15, 23, 42, 0.2);
-            --shadow: rgba(15, 23, 42, 0.08);
-            --shadow-lg: rgba(15, 23, 42, 0.15);
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-            transition: background 0.3s ease, color 0.3s ease;
-            line-height: 1.6;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        .theme-toggle {
-            position: fixed;
-            top: 1.5rem;
-            right: 1.5rem;
-            z-index: 1000;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 0.625rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 2px 8px var(--shadow);
-        }
-
-        .theme-toggle:hover {
-            border-color: var(--border-strong);
-            box-shadow: 0 4px 12px var(--shadow);
-        }
-
-        .theme-toggle svg {
-            width: 24px;
-            height: 24px;
-            fill: var(--text-primary);
-            transition: all 0.3s ease;
-        }
-
-        .container {
-            max-width: 1280px;
-            margin: 0 auto;
-            padding: 0;
-            min-height: 100vh;
-        }
-
-        .header {
-            text-align: center;
-            padding: 3.5rem 2rem 3rem;
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border);
-            animation: slideDown 0.6s ease-out;
-            box-shadow: 0 1px 3px var(--shadow);
-        }
-
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .main-content {
-            padding: 2.5rem 2rem;
-        }
-
-        .header h1 {
-            font-size: 2.5rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            color: var(--text-primary);
-            letter-spacing: -0.02em;
-        }
-
-        .header p {
-            color: var(--text-secondary);
-            font-size: 1.0625rem;
-            max-width: 680px;
-            margin: 0 auto;
-            font-weight: 400;
-            line-height: 1.5;
-        }
-
-        .content-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            animation: slideUp 0.8s ease-out 0.2s both;
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .upload-section,
-        .results-section {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 2rem;
-            backdrop-filter: blur(20px);
-            box-shadow: 0 16px 32px var(--shadow);
-        }
-
-        .upload-area {
-            border: 2px dashed var(--border);
-            border-radius: 16px;
-            padding: 3rem 2rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: var(--bg-card);
-            margin: 1.5rem 0;
-        }
-
-        .upload-area:hover {
-            border-color: var(--accent-primary);
-            background: rgba(99, 102, 241, 0.05);
-            transform: translateY(-2px);
-        }
-
-        .btn {
-            background: var(--accent-primary);
-            color: white;
-            border: none;
-            padding: 0.875rem 2rem;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
-            width: 100%;
-            margin-top: 1.5rem;
-        }
-
-        .btn:hover {
-            background: var(--accent-secondary);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
-        }
-
-        .btn:disabled {
-            background: var(--text-muted);
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-            opacity: 0.6;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 3rem 2rem;
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
-
-        .progress-circle {
-            position: relative;
-            width: 120px;
-            height: 120px;
-            margin: 0 auto 1.5rem;
-        }
-
-        .progress-circle svg {
-            transform: rotate(-90deg);
-        }
-
-        .progress-circle-bg {
-            fill: none;
-            stroke: var(--border);
-            stroke-width: 8;
-        }
-
-        .progress-circle-fill {
-            fill: none;
-            stroke: var(--accent-primary);
-            stroke-width: 8;
-            stroke-linecap: round;
-            transition: stroke-dashoffset 0.3s ease;
-        }
-
-        .progress-text {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .result-item {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin: 1rem 0;
-            transition: all 0.3s ease;
-            animation: slideInRight 0.5s ease-out;
-        }
-
-        @keyframes slideInRight {
-            from {
-                opacity: 0;
-                transform: translateX(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        .result-item:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 32px var(--shadow);
-        }
-
-        .result-label {
-            font-weight: 700;
-            color: var(--accent-primary);
-            margin-bottom: 0.5rem;
-            font-size: 1rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .result-value {
-            font-size: 1.1rem;
-            line-height: 1.5;
-            color: var(--text-primary);
-        }
-
-        .hs-code-display {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--accent-primary);
-            text-align: center;
-            padding: 1.5rem;
-            background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(29, 78, 216, 0.05));
-            border-radius: 12px;
-            margin: 1.5rem 0;
-            letter-spacing: 0.05em;
-        }
-
-        .confidence-container {
-            margin: 1rem 0;
-        }
-
-        .confidence-bar {
-            width: 100%;
-            height: 8px;
-            background: var(--border);
-            border-radius: 4px;
-            margin-top: 0.5rem;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .confidence-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--conf-low), var(--conf-mid) 50%, var(--conf-high) 90%);
-            border-radius: 4px;
-            transition: width 0.8s ease;
-            position: relative;
-        }
-
-        .confidence-label {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.5rem;
-        }
-
-        .confidence-score {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .alternative-code {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1rem;
-            margin: 0.5rem 0;
-        }
-
-        .alternative-code-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.5rem;
-        }
-
-        .alternative-code-number {
-            font-weight: 600;
-            color: var(--accent-primary);
-            font-size: 1.1rem;
-        }
-
-        .alternative-confidence {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-        }
-
-        .collapsible-header {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1rem 1.5rem;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin: 1.5rem 0;
-            transition: all 0.3s ease;
-        }
-
-        .collapsible-header:hover {
-            background: rgba(255, 255, 255, 0.05);
-            border-color: var(--border-strong);
-        }
-
-        .collapsible-header.active {
-            border-bottom-left-radius: 0;
-            border-bottom-right-radius: 0;
-            border-bottom: none;
-        }
-
-        .collapsible-content {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease;
-            border: 1px solid var(--border);
-            border-top: none;
-            border-radius: 0 0 12px 12px;
-        }
-
-        .collapsible-content.active {
-            max-height: 5000px;
-            padding: 1rem;
-        }
-
-        .chevron {
-            transition: transform 0.3s ease;
-        }
-
-        .chevron.rotated {
-            transform: rotate(180deg);
-        }
-
-        .invoice-wrapper {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin: 1.5rem 0;
-        }
-
-        .invoice-container {
-            background: white;
-            color: black;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        .invoice-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 2rem;
-            padding-bottom: 1rem;
-            border-bottom: 2px solid #333;
-        }
-
-        .invoice-title {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #000;
-        }
-
-        .invoice-info {
-            text-align: right;
-        }
-
-        .invoice-section {
-            margin: 1.5rem 0;
-            padding: 1rem;
-            border: 1px solid #ddd;
-        }
-
-        .invoice-section-title {
-            font-weight: 700;
-            background: #f5f5f5;
-            padding: 0.5rem;
-            margin: -1rem -1rem 1rem -1rem;
-            border-bottom: 1px solid #ddd;
-        }
-
-        .invoice-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 1rem 0;
-        }
-
-        .invoice-table th,
-        .invoice-table td {
-            border: 1px solid #ddd;
-            padding: 0.75rem;
-            text-align: left;
-        }
-
-        .invoice-table th {
-            background: #f5f5f5;
-            font-weight: 700;
-        }
-
-        .invoice-footer {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 2rem;
-            padding-top: 1rem;
-            border-top: 2px solid #333;
-        }
-
-        .invoice-actions {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .invoice-btn {
-            background: var(--accent-primary);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.2s ease;
-        }
-
-        .invoice-btn:hover {
-            background: var(--accent-secondary);
-        }
-
-        .characteristic-tag {
-            display: inline-block;
-            background: rgba(37, 99, 235, 0.1);
-            color: var(--accent-primary);
-            padding: 0.4rem 0.8rem;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            margin: 0.25rem;
-            border: 1px solid rgba(37, 99, 235, 0.3);
-        }
-
-        .error {
-            background: var(--error-bg);
-            border: 1px solid var(--error);
-            color: var(--error);
-            padding: 1.5rem;
-            border-radius: 12px;
-            margin: 1rem 0;
-        }
-
-        .not-in-doc {
-            background: var(--warning-bg);
-            border: 2px solid var(--warning);
-            color: var(--warning);
-            padding: 1.5rem;
-            border-radius: 12px;
-            margin: 1rem 0;
-            text-align: center;
-        }
-
-        @media (max-width: 768px) {
-            .content-grid {
-                grid-template-columns: 1fr;
-            }
-            .header h1 {
-                font-size: 2rem;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="theme-toggle" onclick="toggleTheme()">
-        <svg class="sun-icon" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="5" />
-            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-        </svg>
-    </div>
-
-    <div class="container">
-        <div class="header">
-            <h1>🌍 HS Code Classifier</h1>
-            <p>
-                Upload product images for AI-powered HS (Harmonized System) code classification with confidence scoring and detailed analysis
-            </p>
-        </div>
-
-        <div class="main-content">
-            <div class="content-grid">
-                <div class="upload-section">
-                    <h3 style="margin-bottom: 1.5rem; color: var(--text-primary)">
-                        Upload Product Image
-                    </h3>
-
-                    <div
-                        class="upload-area"
-                        onclick="document.getElementById('fileInput').click()"
-                        ondrop="handleDrop(event)"
-                        ondragover="handleDragOver(event)"
-                        ondragleave="handleDragLeave(event)"
-                    >
-                        <div style="width: 64px; height: 64px; margin: 0 auto 1rem; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); border-radius: 16px; display: flex; align-items: center; justify-content: center;">
-                            <svg viewBox="0 0 24 24" style="width: 32px; height: 32px; fill: white">
-                                <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
-                            </svg>
-                        </div>
-                        <p style="font-size: 1.1rem; margin-bottom: 0.5rem; color: var(--text-primary);">
-                            <span id="uploadText">Drop your image here or click to browse</span>
-                        </p>
-                        <p style="color: var(--text-secondary); font-size: 0.9rem">
-                            Supports JPG, PNG, GIF, WebP • Max 10MB
-                        </p>
-                        <input
-                            type="file"
-                            id="fileInput"
-                            accept="image/*"
-                            style="display: none"
-                            onchange="handleFileSelect(event)"
-                        />
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>HS Code Classifier - AI-Powered Classification</title>
+		<style>
+			:root {
+				--bg-primary: #0a0f1e;
+				--bg-secondary: #111827;
+				--bg-card: rgba(255, 255, 255, 0.04);
+				--text-primary: #f9fafb;
+				--text-secondary: #9ca3af;
+				--text-muted: #6b7280;
+				--accent-primary: #2563eb;
+				--accent-secondary: #1d4ed8;
+				--border: rgba(255, 255, 255, 0.08);
+				--border-strong: rgba(255, 255, 255, 0.15);
+				--shadow: rgba(0, 0, 0, 0.4);
+				--shadow-lg: rgba(0, 0, 0, 0.6);
+				--success: #059669;
+				--success-bg: rgba(5, 150, 105, 0.1);
+				--warning: #d97706;
+				--warning-bg: rgba(217, 119, 6, 0.1);
+				--error: #dc2626;
+				--error-bg: rgba(220, 38, 38, 0.1);
+				--conf-low: #ef4444;
+				--conf-mid: #f59e0b;
+				--conf-high: #10b981;
+			}
+
+			[data-theme="light"] {
+				--bg-primary: #f8fafc;
+				--bg-secondary: #ffffff;
+				--bg-card: #ffffff;
+				--text-primary: #0f172a;
+				--text-secondary: #475569;
+				--text-muted: #94a3b8;
+				--border: rgba(15, 23, 42, 0.1);
+				--border-strong: rgba(15, 23, 42, 0.2);
+				--shadow: rgba(15, 23, 42, 0.08);
+				--shadow-lg: rgba(15, 23, 42, 0.15);
+			}
+
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+
+			body {
+				font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+					"Helvetica Neue", Arial, sans-serif;
+				background: var(--bg-primary);
+				color: var(--text-primary);
+				min-height: 100vh;
+				transition: background 0.3s ease, color 0.3s ease;
+				line-height: 1.6;
+				-webkit-font-smoothing: antialiased;
+			}
+
+			.theme-toggle {
+				position: fixed;
+				top: 1.5rem;
+				right: 1.5rem;
+				z-index: 1000;
+				background: var(--bg-card);
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				padding: 0.625rem;
+				cursor: pointer;
+				transition: all 0.2s ease;
+				backdrop-filter: blur(10px);
+				box-shadow: 0 2px 8px var(--shadow);
+			}
+
+			.theme-toggle:hover {
+				border-color: var(--border-strong);
+				box-shadow: 0 4px 12px var(--shadow);
+			}
+
+			.theme-toggle svg {
+				width: 24px;
+				height: 24px;
+				fill: var(--text-primary);
+				transition: all 0.3s ease;
+			}
+
+			.container {
+				max-width: 1280px;
+				margin: 0 auto;
+				padding: 0;
+				min-height: 100vh;
+			}
+
+			.header {
+				text-align: center;
+				padding: 3.5rem 2rem 3rem;
+				background: var(--bg-secondary);
+				border-bottom: 1px solid var(--border);
+				animation: slideDown 0.6s ease-out;
+				box-shadow: 0 1px 3px var(--shadow);
+			}
+
+			@keyframes slideDown {
+				from {
+					opacity: 0;
+					transform: translateY(-20px);
+				}
+				to {
+					opacity: 1;
+					transform: translateY(0);
+				}
+			}
+
+			.main-content {
+				padding: 2.5rem 2rem;
+			}
+
+			.header h1 {
+				font-size: 2.5rem;
+				font-weight: 600;
+				margin-bottom: 1rem;
+				color: var(--text-primary);
+				letter-spacing: -0.02em;
+			}
+
+			.header p {
+				color: var(--text-secondary);
+				font-size: 1.0625rem;
+				max-width: 680px;
+				margin: 0 auto;
+				font-weight: 400;
+				line-height: 1.5;
+			}
+
+			.content-grid {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 2rem;
+				animation: slideUp 0.8s ease-out 0.2s both;
+			}
+
+			@keyframes slideUp {
+				from {
+					opacity: 0;
+					transform: translateY(30px);
+				}
+				to {
+					opacity: 1;
+					transform: translateY(0);
+				}
+			}
+
+			.upload-section,
+			.results-section {
+				background: var(--bg-card);
+				border: 1px solid var(--border);
+				border-radius: 20px;
+				padding: 2rem;
+				backdrop-filter: blur(20px);
+				box-shadow: 0 16px 32px var(--shadow);
+			}
+
+			.upload-options {
+				display: flex;
+				flex-direction: column;
+				gap: 1rem;
+				margin: 1.5rem 0;
+			}
+
+			.upload-area {
+				border: 2px dashed var(--border);
+				border-radius: 16px;
+				padding: 2rem 1.5rem;
+				text-align: center;
+				cursor: pointer;
+				transition: all 0.3s ease;
+				background: var(--bg-card);
+			}
+
+			.upload-area:hover {
+				border-color: var(--accent-primary);
+				background: rgba(99, 102, 241, 0.05);
+				transform: translateY(-2px);
+			}
+
+			.camera-area:hover {
+				border-color: #10b981;
+				background: rgba(16, 185, 129, 0.05);
+			}
+
+			.upload-divider {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				margin: 0.5rem 0;
+			}
+
+			.upload-divider::before,
+			.upload-divider::after {
+				content: "";
+				flex: 1;
+				height: 1px;
+				background: var(--border);
+			}
+
+			.upload-divider span {
+				padding: 0 1rem;
+				color: var(--text-muted);
+				font-size: 0.9rem;
+				font-weight: 500;
+				background: var(--bg-primary);
+			}
+
+			.btn {
+				background: var(--accent-primary);
+				color: white;
+				border: none;
+				padding: 0.875rem 2rem;
+				border-radius: 8px;
+				font-weight: 600;
+				font-size: 1rem;
+				cursor: pointer;
+				transition: all 0.2s ease;
+				box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+				width: 100%;
+				margin-top: 1.5rem;
+			}
+
+			.btn:hover {
+				background: var(--accent-secondary);
+				transform: translateY(-1px);
+				box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+			}
+
+			.btn:disabled {
+				background: var(--text-muted);
+				cursor: not-allowed;
+				transform: none;
+				box-shadow: none;
+				opacity: 0.6;
+			}
+
+			.loading {
+				text-align: center;
+				padding: 3rem 2rem;
+				animation: pulse 2s ease-in-out infinite;
+			}
+
+			@keyframes pulse {
+				0%,
+				100% {
+					opacity: 1;
+				}
+				50% {
+					opacity: 0.6;
+				}
+			}
+
+			.progress-circle {
+				position: relative;
+				width: 120px;
+				height: 120px;
+				margin: 0 auto 1.5rem;
+			}
+
+			.progress-circle svg {
+				transform: rotate(-90deg);
+			}
+
+			.progress-circle-bg {
+				fill: none;
+				stroke: var(--border);
+				stroke-width: 8;
+			}
+
+			.progress-circle-fill {
+				fill: none;
+				stroke: var(--accent-primary);
+				stroke-width: 8;
+				stroke-linecap: round;
+				transition: stroke-dashoffset 0.3s ease;
+			}
+
+			.progress-text {
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				font-size: 1.5rem;
+				font-weight: 600;
+				color: var(--text-primary);
+			}
+
+			.result-item {
+				background: var(--bg-card);
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				padding: 1.5rem;
+				margin: 1rem 0;
+				transition: all 0.3s ease;
+				animation: slideInRight 0.5s ease-out;
+			}
+
+			@keyframes slideInRight {
+				from {
+					opacity: 0;
+					transform: translateX(20px);
+				}
+				to {
+					opacity: 1;
+					transform: translateX(0);
+				}
+			}
+
+			.result-item:hover {
+				transform: translateY(-2px);
+				box-shadow: 0 8px 32px var(--shadow);
+			}
+
+			.result-label {
+				font-weight: 700;
+				color: var(--accent-primary);
+				margin-bottom: 0.5rem;
+				font-size: 1rem;
+				text-transform: uppercase;
+				letter-spacing: 0.5px;
+			}
+
+			.result-value {
+				font-size: 1.1rem;
+				line-height: 1.5;
+				color: var(--text-primary);
+			}
+
+			.hs-code-display {
+				font-size: 2rem;
+				font-weight: 700;
+				color: var(--accent-primary);
+				text-align: center;
+				padding: 1.5rem;
+				background: linear-gradient(
+					135deg,
+					rgba(37, 99, 235, 0.1),
+					rgba(29, 78, 216, 0.05)
+				);
+				border-radius: 12px;
+				margin: 1.5rem 0;
+				letter-spacing: 0.05em;
+			}
+
+			.confidence-container {
+				margin: 1rem 0;
+			}
+
+			.confidence-bar {
+				width: 100%;
+				height: 8px;
+				background: var(--border);
+				border-radius: 4px;
+				margin-top: 0.5rem;
+				overflow: hidden;
+				position: relative;
+			}
+
+			.confidence-fill {
+				height: 100%;
+				background: linear-gradient(
+					90deg,
+					var(--conf-low),
+					var(--conf-mid) 50%,
+					var(--conf-high) 90%
+				);
+				border-radius: 4px;
+				transition: width 0.8s ease;
+				position: relative;
+			}
+
+			.confidence-label {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				margin-bottom: 0.5rem;
+			}
+
+			.confidence-score {
+				font-size: 1.25rem;
+				font-weight: 600;
+				color: var(--text-primary);
+			}
+
+			.alternative-code {
+				background: rgba(255, 255, 255, 0.02);
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				padding: 1rem;
+				margin: 0.5rem 0;
+			}
+
+			.alternative-code-header {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				margin-bottom: 0.5rem;
+			}
+
+			.alternative-code-number {
+				font-weight: 600;
+				color: var(--accent-primary);
+				font-size: 1.1rem;
+			}
+
+			.alternative-confidence {
+				font-size: 0.9rem;
+				color: var(--text-secondary);
+			}
+
+			.collapsible-header {
+				background: rgba(255, 255, 255, 0.03);
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				padding: 1rem 1.5rem;
+				cursor: pointer;
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				margin: 1.5rem 0;
+				transition: all 0.3s ease;
+			}
+
+			.collapsible-header:hover {
+				background: rgba(255, 255, 255, 0.05);
+				border-color: var(--border-strong);
+			}
+
+			.collapsible-header.active {
+				border-bottom-left-radius: 0;
+				border-bottom-right-radius: 0;
+				border-bottom: none;
+			}
+
+			.collapsible-content {
+				max-height: 0;
+				overflow: hidden;
+				transition: max-height 0.3s ease;
+				border: 1px solid var(--border);
+				border-top: none;
+				border-radius: 0 0 12px 12px;
+			}
+
+			.collapsible-content.active {
+				max-height: 5000px;
+				padding: 1rem;
+			}
+
+			.chevron {
+				transition: transform 0.3s ease;
+			}
+
+			.chevron.rotated {
+				transform: rotate(180deg);
+			}
+
+			.invoice-wrapper {
+				background: var(--bg-card);
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				padding: 1.5rem;
+				margin: 1.5rem 0;
+			}
+
+			.invoice-container {
+				background: white;
+				color: black;
+				padding: 2rem;
+				border-radius: 8px;
+				box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+			}
+
+			.invoice-header {
+				display: flex;
+				justify-content: space-between;
+				align-items: flex-start;
+				margin-bottom: 2rem;
+				padding-bottom: 1rem;
+				border-bottom: 2px solid #333;
+			}
+
+			.invoice-title {
+				font-size: 2rem;
+				font-weight: 700;
+				color: #000;
+			}
+
+			.invoice-info {
+				text-align: right;
+			}
+
+			.invoice-section {
+				margin: 1.5rem 0;
+				padding: 1rem;
+				border: 1px solid #ddd;
+			}
+
+			.invoice-section-title {
+				font-weight: 700;
+				background: #f5f5f5;
+				padding: 0.5rem;
+				margin: -1rem -1rem 1rem -1rem;
+				border-bottom: 1px solid #ddd;
+			}
+
+			.invoice-table {
+				width: 100%;
+				border-collapse: collapse;
+				margin: 1rem 0;
+			}
+
+			.invoice-table th,
+			.invoice-table td {
+				border: 1px solid #ddd;
+				padding: 0.75rem;
+				text-align: left;
+			}
+
+			.invoice-table th {
+				background: #f5f5f5;
+				font-weight: 700;
+			}
+
+			.invoice-footer {
+				display: flex;
+				justify-content: space-between;
+				margin-top: 2rem;
+				padding-top: 1rem;
+				border-top: 2px solid #333;
+			}
+
+			.invoice-actions {
+				display: flex;
+				gap: 1rem;
+				margin-bottom: 1rem;
+			}
+
+			.invoice-btn {
+				background: var(--accent-primary);
+				color: white;
+				border: none;
+				padding: 0.5rem 1rem;
+				border-radius: 6px;
+				cursor: pointer;
+				font-size: 0.9rem;
+				transition: all 0.2s ease;
+			}
+
+			.invoice-btn:hover {
+				background: var(--accent-secondary);
+			}
+
+			.characteristic-tag {
+				display: inline-block;
+				background: rgba(37, 99, 235, 0.1);
+				color: var(--accent-primary);
+				padding: 0.4rem 0.8rem;
+				border-radius: 6px;
+				font-size: 0.9rem;
+				margin: 0.25rem;
+				border: 1px solid rgba(37, 99, 235, 0.3);
+			}
+
+			/* Tab Styles */
+			.tab-container {
+				margin: 1.5rem 0;
+			}
+
+			.tab-navigation {
+				display: flex;
+				gap: 0.5rem;
+				margin-bottom: 1.5rem;
+			}
+
+			.tab-button {
+				flex: 1;
+				background: var(--bg-card);
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				padding: 1rem 1.5rem;
+				cursor: pointer;
+				transition: all 0.3s ease;
+				font-weight: 500;
+				font-size: 0.95rem;
+				text-align: center;
+				color: var(--text-secondary);
+				backdrop-filter: blur(10px);
+			}
+
+			.tab-button:hover {
+				border-color: var(--border-strong);
+				background: rgba(255, 255, 255, 0.05);
+				transform: translateY(-1px);
+			}
+
+			.tab-button.active {
+				background: var(--accent-primary);
+				color: white;
+				border-color: var(--accent-primary);
+				box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+			}
+
+			.tab-content {
+				display: none;
+				animation: fadeIn 0.3s ease-in-out;
+			}
+
+			.tab-content.active {
+				display: block;
+			}
+
+			@keyframes fadeIn {
+				from {
+					opacity: 0;
+					transform: translateY(10px);
+				}
+				to {
+					opacity: 1;
+					transform: translateY(0);
+				}
+			}
+
+			/* Chart Styles */
+			.clearance-chart {
+				background: var(--bg-card);
+				border: 1px solid var(--border);
+				border-radius: 16px;
+				padding: 2rem;
+				margin: 1rem 0;
+			}
+
+			.chart-header {
+				text-align: center;
+				margin-bottom: 2rem;
+			}
+
+			.chart-title {
+				font-size: 1.5rem;
+				font-weight: 600;
+				color: var(--text-primary);
+				margin-bottom: 0.5rem;
+			}
+
+			.chart-summary {
+				font-size: 1.1rem;
+				color: #f59e0b;
+				font-weight: 500;
+				background: rgba(245, 158, 11, 0.1);
+				padding: 0.75rem 1.5rem;
+				border-radius: 8px;
+				border: 1px solid rgba(245, 158, 11, 0.3);
+				display: inline-block;
+			}
+
+			.chart-bars {
+				display: flex;
+				flex-direction: column;
+				gap: 1rem;
+			}
+
+			.chart-bar-container {
+				display: flex;
+				align-items: center;
+				gap: 1rem;
+			}
+
+			.chart-bar-label {
+				min-width: 80px;
+				font-weight: 500;
+				color: var(--text-primary);
+				font-size: 0.95rem;
+			}
+
+			.chart-bar-track {
+				flex: 1;
+				height: 24px;
+				background: var(--border);
+				border-radius: 12px;
+				overflow: hidden;
+				position: relative;
+			}
+
+			.chart-bar-fill {
+				height: 100%;
+				background: linear-gradient(
+					90deg,
+					var(--accent-primary),
+					var(--accent-secondary)
+				);
+				border-radius: 12px;
+				width: 0%;
+				transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+				position: relative;
+			}
+
+			.chart-bar-fill.animate {
+				animation: barFill 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+			}
+
+			@keyframes barFill {
+				from {
+					width: 0%;
+				}
+				to {
+					width: var(--target-width);
+				}
+			}
+
+			.chart-bar-percentage {
+				min-width: 50px;
+				text-align: right;
+				font-weight: 600;
+				color: var(--text-primary);
+				font-size: 0.95rem;
+			}
+
+			/* Camera Modal Styles */
+			.camera-modal {
+				position: fixed;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				background: rgba(0, 0, 0, 0.8);
+				display: none;
+				justify-content: center;
+				align-items: center;
+				z-index: 2000;
+				backdrop-filter: blur(10px);
+			}
+
+			.camera-modal.active {
+				display: flex;
+			}
+
+			.camera-container {
+				background: var(--bg-card);
+				border: 1px solid var(--border);
+				border-radius: 20px;
+				padding: 2rem;
+				max-width: 90vw;
+				max-height: 90vh;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 1.5rem;
+			}
+
+			.camera-preview {
+				width: 100%;
+				max-width: 500px;
+				height: 400px;
+				background: var(--border);
+				border-radius: 12px;
+				overflow: hidden;
+				position: relative;
+			}
+
+			.camera-preview video {
+				width: 100%;
+				height: 100%;
+				object-fit: cover;
+			}
+
+			.camera-preview canvas {
+				display: none;
+			}
+
+			.camera-controls {
+				display: flex;
+				gap: 1rem;
+				align-items: center;
+			}
+
+			.camera-btn {
+				padding: 0.75rem 1.5rem;
+				border: none;
+				border-radius: 8px;
+				font-weight: 600;
+				cursor: pointer;
+				transition: all 0.2s ease;
+				font-size: 1rem;
+			}
+
+			.camera-btn.primary {
+				background: #10b981;
+				color: white;
+			}
+
+			.camera-btn.primary:hover {
+				background: #059669;
+				transform: translateY(-1px);
+			}
+
+			.camera-btn.secondary {
+				background: var(--text-muted);
+				color: white;
+			}
+
+			.camera-btn.secondary:hover {
+				background: var(--text-secondary);
+			}
+
+			.camera-btn:disabled {
+				opacity: 0.5;
+				cursor: not-allowed;
+				transform: none;
+			}
+
+			.camera-status {
+				color: var(--text-secondary);
+				font-size: 0.9rem;
+				text-align: center;
+			}
+
+			.error {
+				background: var(--error-bg);
+				border: 1px solid var(--error);
+				color: var(--error);
+				padding: 1.5rem;
+				border-radius: 12px;
+				margin: 1rem 0;
+			}
+
+			.not-in-doc {
+				background: var(--warning-bg);
+				border: 2px solid var(--warning);
+				color: var(--warning);
+				padding: 1.5rem;
+				border-radius: 12px;
+				margin: 1rem 0;
+				text-align: center;
+			}
+
+			@media (max-width: 768px) {
+				.content-grid {
+					grid-template-columns: 1fr;
+				}
+				.header h1 {
+					font-size: 2rem;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div class="theme-toggle" onclick="toggleTheme()">
+			<svg class="sun-icon" viewBox="0 0 24 24">
+				<circle cx="12" cy="12" r="5" />
+				<path
+					d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"
+				/>
+			</svg>
+		</div>
+
+		<div class="container">
+			<div class="header">
+				<h1>🌍 HS Code Classifier</h1>
+				<p>
+					Upload product images for AI-powered HS (Harmonized System) code
+					classification with confidence scoring and detailed analysis
+				</p>
+			</div>
+
+			<div class="main-content">
+				<div class="content-grid">
+					<div class="upload-section">
+						<h3 style="margin-bottom: 1.5rem; color: var(--text-primary)">
+							Upload Product Image
+						</h3>
+
+						<div class="upload-options">
+							<div
+								class="upload-area"
+								onclick="document.getElementById('fileInput').click()"
+								ondrop="handleDrop(event)"
+								ondragover="handleDragOver(event)"
+								ondragleave="handleDragLeave(event)"
+							>
+								<div
+									style="
+										width: 64px;
+										height: 64px;
+										margin: 0 auto 1rem;
+										background: linear-gradient(
+											135deg,
+											var(--accent-primary),
+											var(--accent-secondary)
+										);
+										border-radius: 16px;
+										display: flex;
+										align-items: center;
+										justify-content: center;
+									"
+								>
+									<svg
+										viewBox="0 0 24 24"
+										style="width: 32px; height: 32px; fill: white"
+									>
+										<path
+											d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"
+										/>
+									</svg>
+								</div>
+								<p
+									style="
+										font-size: 1.1rem;
+										margin-bottom: 0.5rem;
+										color: var(--text-primary);
+									"
+								>
+									<span id="uploadText"
+										>Drop your image here or click to browse</span
+									>
+								</p>
+								<p style="color: var(--text-secondary); font-size: 0.9rem">
+									Supports JPG, PNG, GIF, WebP • Max 10MB
+								</p>
+								<input
+									type="file"
+									id="fileInput"
+									accept="image/*"
+									style="display: none"
+									onchange="handleFileSelect(event)"
+								/>
+							</div>
+
+							<div class="upload-divider">
+								<span>OR</span>
+							</div>
+
+							<div class="upload-area camera-area" onclick="openCamera()">
+								<div
+									style="
+										width: 64px;
+										height: 64px;
+										margin: 0 auto 1rem;
+										background: linear-gradient(135deg, #10b981, #059669);
+										border-radius: 16px;
+										display: flex;
+										align-items: center;
+										justify-content: center;
+									"
+								>
+									<svg
+										viewBox="0 0 24 24"
+										style="width: 32px; height: 32px; fill: white"
+									>
+										<path
+											d="M4,4H7L9,2H15L17,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9Z"
+										/>
+									</svg>
+								</div>
+								<p
+									style="
+										font-size: 1.1rem;
+										margin-bottom: 0.5rem;
+										color: var(--text-primary);
+									"
+								>
+									Capture with Camera
+								</p>
+								<p style="color: var(--text-secondary); font-size: 0.9rem">
+									Take a photo directly<br />
+									<span style="font-size: 0.8rem; opacity: 0.8"
+										>Requires camera permission</span
+									>
+								</p>
+							</div>
+						</div>
+
+						<div
+							id="imagePreview"
+							style="display: none; margin-top: 2rem; text-align: center"
+						>
+							<h4 style="margin-bottom: 1rem; color: var(--text-primary)">
+								Selected Image
+							</h4>
+							<img
+								id="previewImg"
+								style="
+									max-width: 100%;
+									max-height: 300px;
+									border-radius: 16px;
+									box-shadow: 0 16px 32px var(--shadow);
+									border: 2px solid var(--border);
+								"
+								alt="Preview"
+							/>
+						</div>
+
+						<button
+							id="classifyBtn"
+							class="btn"
+							onclick="classifyImage()"
+							disabled
+						>
+							Classify HS Code
+						</button>
+					</div>
+
+					<div class="results-section">
+						<h3 style="margin-bottom: 1.5rem; color: var(--text-primary)">
+							Classification Results
+						</h3>
+
+						<div id="loading" style="display: none">
+							<div class="loading">
+								<div class="progress-circle">
+									<svg width="120" height="120">
+										<circle
+											class="progress-circle-bg"
+											cx="60"
+											cy="60"
+											r="52"
+										></circle>
+										<circle
+											id="progressCircleFill"
+											class="progress-circle-fill"
+											cx="60"
+											cy="60"
+											r="52"
+											stroke-dasharray="326.73"
+											stroke-dashoffset="326.73"
+										></circle>
+									</svg>
+									<div class="progress-text" id="progressText">0%</div>
+								</div>
+								<p id="loadingStatus" style="color: var(--text-secondary)">
+									AI is analyzing your product...
+								</p>
+								<p
+									style="
+										color: var(--text-secondary);
+										font-size: 0.9rem;
+										margin-top: 0.5rem;
+									"
+								>
+									Estimated time: 20-30 seconds
+								</p>
+							</div>
+						</div>
+
+						<div id="results" style="display: none">
+							<div class="tab-container">
+								<div class="tab-navigation">
+									<button
+										class="tab-button active"
+										onclick="switchTab('classification')"
+									>
+										📋 Classification Results
+									</button>
+									<button class="tab-button" onclick="switchTab('clearance')">
+										📊 Customs Clearance Trend
+									</button>
+								</div>
+
+								<div id="classification-tab" class="tab-content active">
+									<div id="resultContent"></div>
+								</div>
+
+								<div id="clearance-tab" class="tab-content">
+									<div id="clearanceChart"></div>
+								</div>
+							</div>
+						</div>
+
+						<div
+							id="placeholder"
+							style="
+								text-align: center;
+								padding: 3rem 2rem;
+								color: var(--text-secondary);
+							"
+						>
+							<svg
+								width="64"
+								height="64"
+								viewBox="0 0 24 24"
+								fill="currentColor"
+								style="opacity: 0.3; margin-bottom: 1rem"
+							>
+								<path
+									d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M7,13H17V11H7"
+								/>
+							</svg>
+							<p>Upload a product image to see HS code classification</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Camera Modal -->
+		<div
+			id="cameraModal"
+			class="camera-modal"
+			onclick="closeCameraOnBackdrop(event)"
+		>
+			<div class="camera-container" onclick="event.stopPropagation()">
+				<h3 style="color: var(--text-primary); margin-bottom: 0.5rem">
+					📷 Capture Photo
+				</h3>
+				<div class="camera-preview">
+					<video id="cameraVideo" autoplay playsinline></video>
+					<canvas id="cameraCanvas"></canvas>
+				</div>
+				<div class="camera-controls">
+					<button
+						id="captureBtn"
+						class="camera-btn primary"
+						onclick="capturePhoto()"
+					>
+						📸 Capture
+					</button>
+					<button
+						id="retakeBtn"
+						class="camera-btn secondary"
+						onclick="retakePhoto()"
+						style="display: none"
+					>
+						🔄 Retake
+					</button>
+					<button
+						id="retryBtn"
+						class="camera-btn primary"
+						onclick="openCamera()"
+						style="display: none"
+					>
+						🔄 Try Again
+					</button>
+					<button class="camera-btn secondary" onclick="closeCamera()">
+						❌ Cancel
+					</button>
+				</div>
+				<div id="cameraStatus" class="camera-status">
+					Position your product in the camera view and click Capture
+				</div>
+			</div>
+		</div>
+
+		<script>
+			let selectedFile = null;
+			let customsClearanceData = null;
+			let cameraStream = null;
+			let capturedImage = null;
+
+			// Theme toggle functionality
+			function toggleTheme() {
+				const html = document.documentElement;
+				const currentTheme = html.getAttribute("data-theme");
+				const newTheme = currentTheme === "light" ? "dark" : "light";
+				html.setAttribute("data-theme", newTheme);
+				localStorage.setItem("theme", newTheme);
+			}
+
+			// Load saved theme
+			const savedTheme = localStorage.getItem("theme") || "dark";
+			document.documentElement.setAttribute("data-theme", savedTheme);
+
+			// Keyboard event handler for camera modal
+			document.addEventListener("keydown", function (event) {
+				if (event.key === "Escape") {
+					const modal = document.getElementById("cameraModal");
+					if (modal.classList.contains("active")) {
+						closeCamera();
+					}
+				}
+			});
+
+			// Camera functionality
+			async function openCamera() {
+				const modal = document.getElementById("cameraModal");
+				const video = document.getElementById("cameraVideo");
+				const status = document.getElementById("cameraStatus");
+				const captureBtn = document.getElementById("captureBtn");
+
+				modal.classList.add("active");
+				status.textContent = "Requesting camera access...";
+				captureBtn.disabled = true;
+
+				// Check if getUserMedia is supported
+				if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+					status.textContent =
+						"Camera not supported in this browser. Please use file upload instead.";
+					return;
+				}
+
+				// Check if we're in a secure context (HTTPS or localhost)
+				if (
+					!window.isSecureContext &&
+					location.hostname !== "localhost" &&
+					location.hostname !== "127.0.0.1"
+				) {
+					status.textContent =
+						"Camera requires HTTPS. Please use file upload instead.";
+					return;
+				}
+
+				try {
+					// Request camera access with fallback options
+					let constraints = {
+						video: {
+							facingMode: "environment", // Use back camera on mobile
+							width: { ideal: 1280 },
+							height: { ideal: 720 },
+						},
+					};
+
+					cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+					// If back camera fails, try front camera
+					if (!cameraStream) {
+						constraints.video.facingMode = "user";
+						cameraStream = await navigator.mediaDevices.getUserMedia(
+							constraints
+						);
+					}
+
+					// If specific facingMode fails, try without it
+					if (!cameraStream) {
+						constraints.video = {
+							width: { ideal: 1280 },
+							height: { ideal: 720 },
+						};
+						cameraStream = await navigator.mediaDevices.getUserMedia(
+							constraints
+						);
+					}
+
+					video.srcObject = cameraStream;
+					status.textContent =
+						"Camera ready! Position your product and click Capture.";
+					captureBtn.disabled = false;
+
+					// Add event listener for when video starts playing
+					video.addEventListener("loadedmetadata", function () {
+						status.textContent =
+							"Camera ready! Position your product and click Capture.";
+					});
+				} catch (error) {
+					console.error("Camera access error:", error);
+
+					let errorMessage = "Camera access denied or not available. ";
+
+					if (error.name === "NotAllowedError") {
+						errorMessage += "Please allow camera access and try again.";
+					} else if (error.name === "NotFoundError") {
+						errorMessage += "No camera found on this device.";
+					} else if (error.name === "NotSupportedError") {
+						errorMessage += "Camera not supported in this browser.";
+					} else if (error.name === "NotReadableError") {
+						errorMessage += "Camera is being used by another application.";
+					} else {
+						errorMessage += "Please use file upload instead.";
+					}
+
+					status.textContent = errorMessage;
+					captureBtn.disabled = true;
+					captureBtn.style.display = "none";
+					document.getElementById("retryBtn").style.display = "inline-block";
+				}
+			}
+
+			function closeCamera() {
+				const modal = document.getElementById("cameraModal");
+				const video = document.getElementById("cameraVideo");
+				const status = document.getElementById("cameraStatus");
+				const captureBtn = document.getElementById("captureBtn");
+				const retakeBtn = document.getElementById("retakeBtn");
+				const retryBtn = document.getElementById("retryBtn");
+
+				modal.classList.remove("active");
+
+				// Stop camera stream
+				if (cameraStream) {
+					cameraStream.getTracks().forEach((track) => track.stop());
+					cameraStream = null;
+				}
+
+				// Reset UI
+				video.srcObject = null;
+				status.textContent =
+					"Position your product in the camera view and click Capture";
+				captureBtn.disabled = false;
+				captureBtn.style.display = "inline-block";
+				retakeBtn.style.display = "none";
+				retryBtn.style.display = "none";
+				capturedImage = null;
+			}
+
+			function capturePhoto() {
+				const video = document.getElementById("cameraVideo");
+				const canvas = document.getElementById("cameraCanvas");
+				const ctx = canvas.getContext("2d");
+				const status = document.getElementById("cameraStatus");
+				const captureBtn = document.getElementById("captureBtn");
+				const retakeBtn = document.getElementById("retakeBtn");
+
+				// Set canvas size to match video
+				canvas.width = video.videoWidth;
+				canvas.height = video.videoHeight;
+
+				// Draw video frame to canvas
+				ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+				// Convert canvas to blob
+				canvas.toBlob(
+					function (blob) {
+						if (blob) {
+							// Create file from blob
+							capturedImage = new File([blob], "camera-capture.jpg", {
+								type: "image/jpeg",
+								lastModified: Date.now(),
+							});
+
+							// Update UI
+							status.textContent =
+								'Photo captured! Click "Use Photo" to proceed or "Retake" to try again.';
+							captureBtn.textContent = "✅ Use Photo";
+							captureBtn.onclick = useCapturedPhoto;
+							retakeBtn.style.display = "inline-block";
+
+							// Stop camera preview
+							if (cameraStream) {
+								cameraStream.getTracks().forEach((track) => track.stop());
+							}
+						}
+					},
+					"image/jpeg",
+					0.8
+				);
+			}
+
+			function retakePhoto() {
+				const status = document.getElementById("cameraStatus");
+				const captureBtn = document.getElementById("captureBtn");
+				const retakeBtn = document.getElementById("retakeBtn");
+
+				// Restart camera
+				openCamera();
+
+				// Reset UI
+				status.textContent =
+					"Camera ready! Position your product and click Capture.";
+				captureBtn.textContent = "📸 Capture";
+				captureBtn.onclick = capturePhoto;
+				retakeBtn.style.display = "none";
+				capturedImage = null;
+			}
+
+			function useCapturedPhoto() {
+				if (capturedImage) {
+					selectedFile = capturedImage;
+					updateFileSelection();
+					closeCamera();
+				}
+			}
+
+			function closeCameraOnBackdrop(event) {
+				if (event.target === event.currentTarget) {
+					closeCamera();
+				}
+			}
+
+			// Tab switching functionality
+			function switchTab(tabName) {
+				// Update tab buttons
+				document.querySelectorAll(".tab-button").forEach((btn) => {
+					btn.classList.remove("active");
+				});
+				document
+					.querySelector(`[onclick="switchTab('${tabName}')"]`)
+					.classList.add("active");
+
+				// Update tab content
+				document.querySelectorAll(".tab-content").forEach((content) => {
+					content.classList.remove("active");
+				});
+				document.getElementById(`${tabName}-tab`).classList.add("active");
+
+				// If switching to clearance tab and data exists, render chart
+				if (tabName === "clearance" && customsClearanceData) {
+					renderClearanceChart();
+				}
+			}
+
+			// Chart rendering function
+			function renderClearanceChart() {
+				if (!customsClearanceData) return;
+
+				const chartContainer = document.getElementById("clearanceChart");
+				chartContainer.innerHTML = `
+                <div class="clearance-chart">
+                    <div class="chart-header">
+                        <div class="chart-title">Customs Clearance Trends</div>
+                        <div class="chart-summary">${
+													customsClearanceData.summary
+												}</div>
                     </div>
-
-                    <div id="imagePreview" style="display: none; margin-top: 2rem; text-align: center;">
-                        <h4 style="margin-bottom: 1rem; color: var(--text-primary)">
-                            Selected Image
-                        </h4>
-                        <img
-                            id="previewImg"
-                            style="max-width: 100%; max-height: 300px; border-radius: 16px; box-shadow: 0 16px 32px var(--shadow); border: 2px solid var(--border);"
-                            alt="Preview"
-                        />
-                    </div>
-
-                    <button id="classifyBtn" class="btn" onclick="classifyImage()" disabled>
-                        Classify HS Code
-                    </button>
-                </div>
-
-                <div class="results-section">
-                    <h3 style="margin-bottom: 1.5rem; color: var(--text-primary)">
-                        Classification Results
-                    </h3>
-
-                    <div id="loading" style="display: none">
-                        <div class="loading">
-                            <div class="progress-circle">
-                                <svg width="120" height="120">
-                                    <circle class="progress-circle-bg" cx="60" cy="60" r="52"></circle>
-                                    <circle id="progressCircleFill" class="progress-circle-fill" cx="60" cy="60" r="52" stroke-dasharray="326.73" stroke-dashoffset="326.73"></circle>
-                                </svg>
-                                <div class="progress-text" id="progressText">0%</div>
+                    <div class="chart-bars">
+                        ${customsClearanceData.data
+													.map(
+														(item, index) => `
+                            <div class="chart-bar-container">
+                                <div class="chart-bar-label">${item.days}</div>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill" data-percentage="${item.percentage}"></div>
+                                </div>
+                                <div class="chart-bar-percentage">${item.percentage}%</div>
                             </div>
-                            <p id="loadingStatus" style="color: var(--text-secondary)">
-                                AI is analyzing your product...
-                            </p>
-                            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">
-                                Estimated time: 20-30 seconds
-                            </p>
-                        </div>
-                    </div>
-
-                    <div id="results" style="display: none">
-                        <div id="resultContent"></div>
-                    </div>
-
-                    <div id="placeholder" style="text-align: center; padding: 3rem 2rem; color: var(--text-secondary);">
-                        <svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor" style="opacity: 0.3; margin-bottom: 1rem">
-                            <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M7,13H17V11H7" />
-                        </svg>
-                        <p>Upload a product image to see HS code classification</p>
+                        `
+													)
+													.join("")}
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
+            `;
 
-    <script>
-        let selectedFile = null;
+				// Animate bars with staggered timing
+				setTimeout(() => {
+					const bars = chartContainer.querySelectorAll(".chart-bar-fill");
+					bars.forEach((bar, index) => {
+						setTimeout(() => {
+							const percentage = bar.getAttribute("data-percentage");
+							bar.style.setProperty("--target-width", percentage + "%");
+							bar.style.width = percentage + "%";
+						}, index * 100); // 100ms delay between each bar
+					});
+				}, 100);
+			}
 
-        // Theme toggle functionality
-        function toggleTheme() {
-            const html = document.documentElement;
-            const currentTheme = html.getAttribute("data-theme");
-            const newTheme = currentTheme === "light" ? "dark" : "light";
-            html.setAttribute("data-theme", newTheme);
-            localStorage.setItem("theme", newTheme);
-        }
+			// Progress management
+			let progressInterval = null;
+			let currentProgress = 0;
 
-        // Load saved theme
-        const savedTheme = localStorage.getItem("theme") || "dark";
-        document.documentElement.setAttribute("data-theme", savedTheme);
+			function startProgress() {
+				const totalTime = 30000; // 30 seconds
+				const updateInterval = 100;
+				const totalUpdates = totalTime / updateInterval;
 
-        // Progress management
-        let progressInterval = null;
-        let currentProgress = 0;
+				currentProgress = 0;
+				const circle = document.getElementById("progressCircleFill");
+				const text = document.getElementById("progressText");
+				const circumference = 326.73;
 
-        function startProgress() {
-            const totalTime = 30000; // 30 seconds
-            const updateInterval = 100;
-            const totalUpdates = totalTime / updateInterval;
-            
-            currentProgress = 0;
-            const circle = document.getElementById('progressCircleFill');
-            const text = document.getElementById('progressText');
-            const circumference = 326.73;
+				if (progressInterval) clearInterval(progressInterval);
 
-            if (progressInterval) clearInterval(progressInterval);
+				let updateCount = 0;
+				progressInterval = setInterval(() => {
+					updateCount++;
 
-            let updateCount = 0;
-            progressInterval = setInterval(() => {
-                updateCount++;
-                
-                const linearProgress = updateCount / totalUpdates;
-                const easedProgress = 1 - Math.pow(1 - linearProgress, 3);
-                currentProgress = Math.min(Math.floor(easedProgress * 99), 99);
-                
-                const offset = circumference - (currentProgress / 100) * circumference;
-                circle.style.strokeDashoffset = offset;
-                text.textContent = currentProgress + '%';
+					const linearProgress = updateCount / totalUpdates;
+					const easedProgress = 1 - Math.pow(1 - linearProgress, 3);
+					currentProgress = Math.min(Math.floor(easedProgress * 99), 99);
 
-                if (currentProgress >= 99) {
-                    clearInterval(progressInterval);
-                }
-            }, updateInterval);
-        }
+					const offset =
+						circumference - (currentProgress / 100) * circumference;
+					circle.style.strokeDashoffset = offset;
+					text.textContent = currentProgress + "%";
 
-        function completeProgress() {
-            const circle = document.getElementById('progressCircleFill');
-            const text = document.getElementById('progressText');
-            const circumference = 326.73;
+					if (currentProgress >= 99) {
+						clearInterval(progressInterval);
+					}
+				}, updateInterval);
+			}
 
-            if (progressInterval) clearInterval(progressInterval);
+			function completeProgress() {
+				const circle = document.getElementById("progressCircleFill");
+				const text = document.getElementById("progressText");
+				const circumference = 326.73;
 
-            currentProgress = 100;
-            circle.style.strokeDashoffset = 0;
-            text.textContent = '100%';
+				if (progressInterval) clearInterval(progressInterval);
 
-            return new Promise(resolve => setTimeout(resolve, 300));
-        }
+				currentProgress = 100;
+				circle.style.strokeDashoffset = 0;
+				text.textContent = "100%";
 
-        // Drag and drop functionality
-        function handleDragOver(event) {
-            event.preventDefault();
-            event.currentTarget.style.borderColor = 'var(--accent-primary)';
-        }
+				return new Promise((resolve) => setTimeout(resolve, 300));
+			}
 
-        function handleDragLeave(event) {
-            event.currentTarget.style.borderColor = 'var(--border)';
-        }
+			// Drag and drop functionality
+			function handleDragOver(event) {
+				event.preventDefault();
+				event.currentTarget.style.borderColor = "var(--accent-primary)";
+			}
 
-        function handleDrop(event) {
-            event.preventDefault();
-            event.currentTarget.style.borderColor = 'var(--border)';
-            const files = event.dataTransfer.files;
-            if (files.length > 0) {
-                selectedFile = files[0];
-                updateFileSelection();
-            }
-        }
+			function handleDragLeave(event) {
+				event.currentTarget.style.borderColor = "var(--border)";
+			}
 
-        function handleFileSelect(event) {
-            selectedFile = event.target.files[0];
-            updateFileSelection();
-        }
+			function handleDrop(event) {
+				event.preventDefault();
+				event.currentTarget.style.borderColor = "var(--border)";
+				const files = event.dataTransfer.files;
+				if (files.length > 0) {
+					selectedFile = files[0];
+					updateFileSelection();
+				}
+			}
 
-        function updateFileSelection() {
-            if (selectedFile) {
-                document.getElementById("classifyBtn").disabled = false;
-                document.getElementById("uploadText").textContent = `Selected: ${selectedFile.name}`;
-                document.getElementById("placeholder").style.display = "none";
+			function handleFileSelect(event) {
+				selectedFile = event.target.files[0];
+				updateFileSelection();
+			}
 
-                const reader = new FileReader();
-                reader.onload = function (e) {
-                    document.getElementById("previewImg").src = e.target.result;
-                    document.getElementById("imagePreview").style.display = "block";
-                };
-                reader.readAsDataURL(selectedFile);
-            }
-        }
+			function updateFileSelection() {
+				if (selectedFile) {
+					document.getElementById("classifyBtn").disabled = false;
+					document.getElementById(
+						"uploadText"
+					).textContent = `Selected: ${selectedFile.name}`;
+					document.getElementById("placeholder").style.display = "none";
 
-        function createClassificationCard(classification, index) {
-            const card = document.createElement("div");
-            card.className = "result-item";
-            
-            // Highlight the top classification
-            if (index === 0) {
-                card.style.borderColor = "var(--accent-primary)";
-                card.style.borderWidth = "2px";
-                card.style.background = "rgba(37, 99, 235, 0.08)";
-            }
+					const reader = new FileReader();
+					reader.onload = function (e) {
+						document.getElementById("previewImg").src = e.target.result;
+						document.getElementById("imagePreview").style.display = "block";
+					};
+					reader.readAsDataURL(selectedFile);
+				}
+			}
 
-            const confidencePercent = Math.round(classification.confidence_score * 100);
-            
-            card.innerHTML = `
-                ${index === 0 ? '<div style="color: var(--accent-primary); font-weight: 600; margin-bottom: 1rem; font-size: 0.9rem;">⭐ TOP MATCH</div>' : ''}
+			function createClassificationCard(classification, index) {
+				const card = document.createElement("div");
+				card.className = "result-item";
+
+				// Highlight the top classification
+				if (index === 0) {
+					card.style.borderColor = "var(--accent-primary)";
+					card.style.borderWidth = "2px";
+					card.style.background = "rgba(37, 99, 235, 0.08)";
+				}
+
+				const confidencePercent = Math.round(
+					classification.confidence_score * 100
+				);
+
+				card.innerHTML = `
+                ${
+									index === 0
+										? '<div style="color: var(--accent-primary); font-weight: 600; margin-bottom: 1rem; font-size: 0.9rem;">⭐ TOP MATCH</div>'
+										: ""
+								}
                 
                 <div class="hs-code-display" style="margin: 0 0 1rem 0; padding: 1rem;">
                     ${classification.hs_code}
-                    ${classification.stat_suffix ? `<div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.5rem;">Suffix: ${classification.stat_suffix}</div>` : ''}
+                    ${
+											classification.stat_suffix
+												? `<div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.5rem;">Suffix: ${classification.stat_suffix}</div>`
+												: ""
+										}
                 </div>
 
                 <div class="confidence-container" style="margin-bottom: 1rem;">
@@ -788,57 +1568,82 @@
                     </div>
                 </div>
 
-                ${classification.article_description ? `
+                ${
+									classification.article_description
+										? `
                     <div style="margin-bottom: 1rem;">
                         <div class="result-label">HS Code Description</div>
                         <div class="result-value" style="font-size: 0.95rem; font-style: italic;">${classification.article_description}</div>
                     </div>
-                ` : ''}
+                `
+										: ""
+								}
 
                 <div style="margin-bottom: 1rem;">
                     <div class="result-label">Product in Image</div>
-                    <div class="result-value">${classification.product_description}</div>
+                    <div class="result-value">${
+											classification.product_description
+										}</div>
                 </div>
 
                 <div style="margin-bottom: 1rem;">
                     <div class="result-label">Classification Reasoning</div>
-                    <div class="result-value" style="font-size: 0.95rem;">${classification.reasoning}</div>
+                    <div class="result-value" style="font-size: 0.95rem;">${
+											classification.reasoning
+										}</div>
                 </div>
 
-                ${classification.key_characteristics && classification.key_characteristics.length > 0 ? `
+                ${
+									classification.key_characteristics &&
+									classification.key_characteristics.length > 0
+										? `
                     <div>
                         <div class="result-label">Key Characteristics</div>
                         <div style="margin-top: 0.5rem;">
-                            ${classification.key_characteristics.map(char => `<span class="characteristic-tag">${char}</span>`).join('')}
+                            ${classification.key_characteristics
+															.map(
+																(char) =>
+																	`<span class="characteristic-tag">${char}</span>`
+															)
+															.join("")}
                         </div>
                     </div>
-                ` : ''}
+                `
+										: ""
+								}
             `;
-            
-            return card;
-        }
 
-        function toggleCollapsible(id) {
-            const content = document.getElementById(id);
-            const header = content.previousElementSibling;
-            const chevron = document.getElementById('chevron-' + id);
-            
-            content.classList.toggle('active');
-            header.classList.toggle('active');
-            chevron.classList.toggle('rotated');
-        }
+				return card;
+			}
 
-        function generateInvoice(classification, visualAnalysis) {
-            const container = document.createElement("div");
-            container.style.cssText = "margin: 2rem 0;";
-            
-            const today = new Date();
-            const dateStr = today.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
-            const waybillNumber = 'HTS' + Date.now().toString().slice(-12);
-            const shipmentID = 'SHP' + Math.random().toString(36).substr(2, 9).toUpperCase();
-            const invoiceNumber = 'INV-' + Date.now().toString().slice(-8);
-            
-            const invoiceHTML = `
+			function toggleCollapsible(id) {
+				const content = document.getElementById(id);
+				const header = content.previousElementSibling;
+				const chevron = document.getElementById("chevron-" + id);
+
+				content.classList.toggle("active");
+				header.classList.toggle("active");
+				chevron.classList.toggle("rotated");
+			}
+
+			function generateInvoice(classification, visualAnalysis) {
+				const container = document.createElement("div");
+				container.style.cssText = "margin: 2rem 0;";
+
+				const today = new Date();
+				const dateStr = today
+					.toLocaleDateString("en-GB", {
+						day: "2-digit",
+						month: "short",
+						year: "numeric",
+					})
+					.toUpperCase();
+				const waybillNumber = "HTS" + Date.now().toString().slice(-12);
+				const shipmentID =
+					"SHP" + Math.random().toString(36).substr(2, 9).toUpperCase();
+				const invoiceNumber = "INV-" + Date.now().toString().slice(-8);
+
+				const invoiceHTML = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -887,7 +1692,9 @@
                     <div class="barcode">${shipmentID}</div>
                     <p><strong>Date:</strong> ${dateStr}</p>
                     <p><strong>Invoice No.:</strong> ${invoiceNumber}</p>
-                    <p><strong>Purchase No.:</strong> PO-${Math.floor(Math.random() * 10000)}</p>
+                    <p><strong>Purchase No.:</strong> PO-${Math.floor(
+											Math.random() * 10000
+										)}</p>
                     <p><strong>Terms of Sale (Incoterm):</strong> DAP</p>
                     <p><strong>Reason for Export:</strong> Sample</p>
                 </div>
@@ -925,7 +1732,10 @@
                 <tr>
                     <td>1</td>
                     <td>SET</td>
-                    <td>${(visualAnalysis && visualAnalysis.product_type) || 'Sample Product'}<br>REF: ${classification.hs_code}</td>
+                    <td>${
+											(visualAnalysis && visualAnalysis.product_type) ||
+											"Sample Product"
+										}<br>REF: ${classification.hs_code}</td>
                     <td>${classification.hs_code}</td>
                     <td>US</td>
                     <td>500.00</td>
@@ -985,11 +1795,11 @@
 </body>
 </html>`;
 
-            // Store invoice HTML in window for new tab access
-            const invoiceId = 'invoice-' + Date.now();
-            window[invoiceId] = invoiceHTML;
-            
-            container.innerHTML = `
+				// Store invoice HTML in window for new tab access
+				const invoiceId = "invoice-" + Date.now();
+				window[invoiceId] = invoiceHTML;
+
+				container.innerHTML = `
                 <div class="result-item" style="padding: 1.5rem; text-align: center;">
                     <div class="result-label" style="margin-bottom: 1rem;">📄 Invoice Ready</div>
                     <p style="color: var(--text-secondary); margin-bottom: 1rem;">An invoice has been generated for the top classification result.</p>
@@ -998,245 +1808,337 @@
                     </button>
                 </div>
             `;
-            
-            return container;
-        }
 
-        function openInvoiceInNewTab(invoiceId) {
-            const html = window[invoiceId];
-            if (html) {
-                const newWindow = window.open();
-                newWindow.document.write(html);
-                newWindow.document.close();
-            }
-        }
+				return container;
+			}
 
-        async function classifyImage() {
-            if (!selectedFile) return;
+			function openInvoiceInNewTab(invoiceId) {
+				const html = window[invoiceId];
+				if (html) {
+					const newWindow = window.open();
+					newWindow.document.write(html);
+					newWindow.document.close();
+				}
+			}
 
-            const formData = new FormData();
-            formData.append("file", selectedFile);
+			async function classifyImage() {
+				if (!selectedFile) return;
 
-            document.getElementById("loading").style.display = "block";
-            document.getElementById("results").style.display = "none";
-            document.getElementById("placeholder").style.display = "none";
-            document.getElementById("classifyBtn").disabled = true;
+				const formData = new FormData();
+				formData.append("file", selectedFile);
 
-            startProgress();
+				document.getElementById("loading").style.display = "block";
+				document.getElementById("results").style.display = "none";
+				document.getElementById("placeholder").style.display = "none";
+				document.getElementById("classifyBtn").disabled = true;
 
-            try {
-                const response = await fetch("/api/classify-hs-code", {
-                    method: "POST",
-                    body: formData,
-                });
+				startProgress();
 
-                const result = await response.json();
+				try {
+					const response = await fetch("/api/classify-hs-code", {
+						method: "POST",
+						body: formData,
+					});
 
-                await completeProgress();
-                
-                document.getElementById("loading").style.display = "none";
-                document.getElementById("classifyBtn").disabled = false;
+					const result = await response.json();
 
-                if (result.success) {
-                    displayResults(result.data);
-                } else {
-                    displayError(result.error, result.raw_response);
-                }
-            } catch (error) {
-                await completeProgress();
-                document.getElementById("loading").style.display = "none";
-                document.getElementById("classifyBtn").disabled = false;
-                displayError("Network error: " + error.message);
-            }
-        }
+					await completeProgress();
 
-        function displayResults(data) {
-            const resultContent = document.getElementById("resultContent");
-            resultContent.innerHTML = "";
-            document.getElementById("results").style.display = "block";
+					document.getElementById("loading").style.display = "none";
+					document.getElementById("classifyBtn").disabled = false;
 
-            // Check if product not in document
-            if (data.not_in_document) {
-                const notInDocDiv = document.createElement("div");
-                notInDocDiv.className = "not-in-doc";
-                notInDocDiv.innerHTML = `
+					if (result.success) {
+						// Store customs clearance data for chart
+						customsClearanceData = result.customs_clearance;
+						displayResults(result.data);
+					} else {
+						displayError(result.error, result.raw_response);
+					}
+				} catch (error) {
+					await completeProgress();
+					document.getElementById("loading").style.display = "none";
+					document.getElementById("classifyBtn").disabled = false;
+					displayError("Network error: " + error.message);
+				}
+			}
+
+			function displayResults(data) {
+				const resultContent = document.getElementById("resultContent");
+				resultContent.innerHTML = "";
+				document.getElementById("results").style.display = "block";
+
+				// Reset to classification tab by default
+				switchTab("classification");
+
+				// Check if product not in document
+				if (data.not_in_document) {
+					const notInDocDiv = document.createElement("div");
+					notInDocDiv.className = "not-in-doc";
+					notInDocDiv.innerHTML = `
                     <h3 style="margin-bottom: 1rem;">⚠️ Product Not in HS Document</h3>
-                    <p style="color: var(--text-primary);">${data.reason || "This product does not match any codes in the provided HS code document."}</p>
+                    <p style="color: var(--text-primary);">${
+											data.reason ||
+											"This product does not match any codes in the provided HS code document."
+										}</p>
                 `;
-                resultContent.appendChild(notInDocDiv);
+					resultContent.appendChild(notInDocDiv);
 
-                // Still show visual analysis if available
-                if (data.visual_analysis) {
-                    const visualDiv = document.createElement("div");
-                    visualDiv.className = "result-item";
-                    visualDiv.innerHTML = `
+					// Still show visual analysis if available
+					if (data.visual_analysis) {
+						const visualDiv = document.createElement("div");
+						visualDiv.className = "result-item";
+						visualDiv.innerHTML = `
                         <div class="result-label">Visual Analysis</div>
                         <div class="result-value">
-                            <p><strong>Product Type:</strong> ${data.visual_analysis.product_type || 'Unknown'}</p>
-                            <p><strong>Color:</strong> ${data.visual_analysis.color || 'Unknown'}</p>
-                            <p><strong>Processing State:</strong> ${data.visual_analysis.processing_state || 'Unknown'}</p>
-                            ${data.visual_analysis.packaging ? `<p><strong>Packaging:</strong> ${data.visual_analysis.packaging}</p>` : ''}
-                            ${data.visual_analysis.special_markers ? `<p><strong>Special Markers:</strong> ${data.visual_analysis.special_markers}</p>` : ''}
+                            <p><strong>Product Type:</strong> ${
+															data.visual_analysis.product_type || "Unknown"
+														}</p>
+                            <p><strong>Color:</strong> ${
+															data.visual_analysis.color || "Unknown"
+														}</p>
+                            <p><strong>Processing State:</strong> ${
+															data.visual_analysis.processing_state || "Unknown"
+														}</p>
+                            ${
+															data.visual_analysis.packaging
+																? `<p><strong>Packaging:</strong> ${data.visual_analysis.packaging}</p>`
+																: ""
+														}
+                            ${
+															data.visual_analysis.special_markers
+																? `<p><strong>Special Markers:</strong> ${data.visual_analysis.special_markers}</p>`
+																: ""
+														}
                         </div>
                     `;
-                    resultContent.appendChild(visualDiv);
-                }
-                return;
-            }
+						resultContent.appendChild(visualDiv);
+					}
+					return;
+				}
 
-            // Create collapsible section for analysis details
-            const hasExtraction = data.label_text_extraction;
-            const hasAnalysis = data.visual_analysis;
-            
-            if (hasExtraction || hasAnalysis) {
-                const detailsId = 'analysis-details-' + Date.now();
-                
-                // Create collapsible header
-                const collapsibleHeader = document.createElement("div");
-                collapsibleHeader.className = "collapsible-header";
-                collapsibleHeader.onclick = () => toggleCollapsible(detailsId);
-                collapsibleHeader.style.marginTop = "0";
-                collapsibleHeader.innerHTML = `
+				// Create collapsible section for analysis details
+				const hasExtraction = data.label_text_extraction;
+				const hasAnalysis = data.visual_analysis;
+
+				if (hasExtraction || hasAnalysis) {
+					const detailsId = "analysis-details-" + Date.now();
+
+					// Create collapsible header
+					const collapsibleHeader = document.createElement("div");
+					collapsibleHeader.className = "collapsible-header";
+					collapsibleHeader.onclick = () => toggleCollapsible(detailsId);
+					collapsibleHeader.style.marginTop = "0";
+					collapsibleHeader.innerHTML = `
                     <span style="font-size: 0.9rem; color: var(--text-secondary);">🔍 Analysis Details (Text Extraction & Visual Analysis)</span>
                     <svg class="chevron" id="chevron-${detailsId}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>
                 `;
-                resultContent.appendChild(collapsibleHeader);
-                
-                // Create collapsible content
-                const collapsibleContent = document.createElement("div");
-                collapsibleContent.className = "collapsible-content";
-                collapsibleContent.id = detailsId;
-                
-                // Label Text Extraction
-                if (hasExtraction) {
-                    const extractionDiv = document.createElement("div");
-                    extractionDiv.className = "result-item";
-                    extractionDiv.style.marginBottom = "1rem";
-                    
-                    const hasQualifiers = data.label_text_extraction.qualifier_keywords && data.label_text_extraction.qualifier_keywords.length > 0;
-                    const hasCertifications = data.label_text_extraction.certification_marks && data.label_text_extraction.certification_marks.length > 0;
-                    
-                    extractionDiv.innerHTML = `
+					resultContent.appendChild(collapsibleHeader);
+
+					// Create collapsible content
+					const collapsibleContent = document.createElement("div");
+					collapsibleContent.className = "collapsible-content";
+					collapsibleContent.id = detailsId;
+
+					// Label Text Extraction
+					if (hasExtraction) {
+						const extractionDiv = document.createElement("div");
+						extractionDiv.className = "result-item";
+						extractionDiv.style.marginBottom = "1rem";
+
+						const hasQualifiers =
+							data.label_text_extraction.qualifier_keywords &&
+							data.label_text_extraction.qualifier_keywords.length > 0;
+						const hasCertifications =
+							data.label_text_extraction.certification_marks &&
+							data.label_text_extraction.certification_marks.length > 0;
+
+						extractionDiv.innerHTML = `
                         <div class="result-label" style="font-size: 0.85rem; opacity: 0.8;">📋 Label Text Extraction</div>
                         <div class="result-value" style="font-size: 0.9rem;">
-                            ${data.label_text_extraction.visible_text && data.label_text_extraction.visible_text.length > 0 ? `
+                            ${
+															data.label_text_extraction.visible_text &&
+															data.label_text_extraction.visible_text.length > 0
+																? `
                                 <div style="margin-bottom: 1rem;">
                                     <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.5rem;">Visible Text:</div>
                                     <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
-                                        ${data.label_text_extraction.visible_text.map(text => `<span class="characteristic-tag" style="font-size: 0.85rem;">${text}</span>`).join('')}
+                                        ${data.label_text_extraction.visible_text
+																					.map(
+																						(text) =>
+																							`<span class="characteristic-tag" style="font-size: 0.85rem;">${text}</span>`
+																					)
+																					.join("")}
                                     </div>
                                 </div>
-                            ` : ''}
+                            `
+																: ""
+														}
                             
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem;">
                                 <div>
                                     <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.25rem;">Certification Marks</div>
-                                    <div style="color: ${hasCertifications ? 'var(--success)' : 'var(--text-muted)'}; font-weight: 500;">
-                                        ${hasCertifications ? data.label_text_extraction.certification_marks.join(', ') : 'None'}
+                                    <div style="color: ${
+																			hasCertifications
+																				? "var(--success)"
+																				: "var(--text-muted)"
+																		}; font-weight: 500;">
+                                        ${
+																					hasCertifications
+																						? data.label_text_extraction.certification_marks.join(
+																								", "
+																						  )
+																						: "None"
+																				}
                                     </div>
                                 </div>
                                 
                                 <div>
                                     <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.25rem;">Qualifier Keywords</div>
-                                    <div style="color: ${hasQualifiers ? 'var(--success)' : 'var(--text-muted)'}; font-weight: 500;">
-                                        ${hasQualifiers ? data.label_text_extraction.qualifier_keywords.join(', ') : 'None'}
+                                    <div style="color: ${
+																			hasQualifiers
+																				? "var(--success)"
+																				: "var(--text-muted)"
+																		}; font-weight: 500;">
+                                        ${
+																					hasQualifiers
+																						? data.label_text_extraction.qualifier_keywords.join(
+																								", "
+																						  )
+																						: "None"
+																				}
                                     </div>
                                 </div>
                             </div>
                             
-                            ${!hasQualifiers && !hasCertifications ? `
+                            ${
+															!hasQualifiers && !hasCertifications
+																? `
                                 <div style="background: rgba(251, 191, 36, 0.1); border-left: 3px solid #f59e0b; padding: 0.75rem; margin-top: 1rem; border-radius: 4px;">
                                     <div style="color: var(--text-secondary); font-size: 0.85rem;">
                                         No specific qualifiers found → Using general "Other" classification
                                     </div>
                                 </div>
-                            ` : ''}
+                            `
+																: ""
+														}
                         </div>
                     `;
-                    collapsibleContent.appendChild(extractionDiv);
-                }
-                
-                // Visual Analysis
-                if (hasAnalysis) {
-                    const visualDiv = document.createElement("div");
-                    visualDiv.className = "result-item";
-                    visualDiv.innerHTML = `
+						collapsibleContent.appendChild(extractionDiv);
+					}
+
+					// Visual Analysis
+					if (hasAnalysis) {
+						const visualDiv = document.createElement("div");
+						visualDiv.className = "result-item";
+						visualDiv.innerHTML = `
                         <div class="result-label" style="font-size: 0.85rem; opacity: 0.8;">🔍 Visual Analysis</div>
                         <div class="result-value" style="font-size: 0.9rem;">
                             <div style="margin-bottom: 0.5rem;">
-                                <strong style="color: var(--text-primary);">${data.visual_analysis.product_type || 'Unknown Product'}</strong>
+                                <strong style="color: var(--text-primary);">${
+																	data.visual_analysis.product_type ||
+																	"Unknown Product"
+																}</strong>
                             </div>
                             <div style="color: var(--text-secondary); font-size: 0.85rem; line-height: 1.6;">
-                                ${data.visual_analysis.color ? `Color: ${data.visual_analysis.color}` : ''} 
-                                ${data.visual_analysis.processing_state ? `• State: ${data.visual_analysis.processing_state}` : ''}
-                                ${data.visual_analysis.packaging ? `<br>Packaging: ${data.visual_analysis.packaging}` : ''}
-                                ${data.visual_analysis.decorative_elements ? `<br>Decorative: ${data.visual_analysis.decorative_elements}` : ''}
+                                ${
+																	data.visual_analysis.color
+																		? `Color: ${data.visual_analysis.color}`
+																		: ""
+																} 
+                                ${
+																	data.visual_analysis.processing_state
+																		? `• State: ${data.visual_analysis.processing_state}`
+																		: ""
+																}
+                                ${
+																	data.visual_analysis.packaging
+																		? `<br>Packaging: ${data.visual_analysis.packaging}`
+																		: ""
+																}
+                                ${
+																	data.visual_analysis.decorative_elements
+																		? `<br>Decorative: ${data.visual_analysis.decorative_elements}`
+																		: ""
+																}
                             </div>
                         </div>
                     `;
-                    collapsibleContent.appendChild(visualDiv);
-                }
-                
-                resultContent.appendChild(collapsibleContent);
-            }
+						collapsibleContent.appendChild(visualDiv);
+					}
 
-            // Display classifications as cards
-            if (data.classifications && data.classifications.length > 0) {
-                const classificationsHeader = document.createElement("div");
-                classificationsHeader.style.cssText = "margin: 1.5rem 0 1rem 0; color: var(--text-secondary); font-size: 0.95rem;";
-                classificationsHeader.textContent = `Found ${data.classifications.length} possible classification${data.classifications.length > 1 ? 's' : ''} (ordered by confidence):`;
-                resultContent.appendChild(classificationsHeader);
+					resultContent.appendChild(collapsibleContent);
+				}
 
-                // Display TOP MATCH first
-                const topMatch = data.classifications[0];
-                const topCard = createClassificationCard(topMatch, 0);
-                resultContent.appendChild(topCard);
+				// Display classifications as cards
+				if (data.classifications && data.classifications.length > 0) {
+					const classificationsHeader = document.createElement("div");
+					classificationsHeader.style.cssText =
+						"margin: 1.5rem 0 1rem 0; color: var(--text-secondary); font-size: 0.95rem;";
+					classificationsHeader.textContent = `Found ${
+						data.classifications.length
+					} possible classification${
+						data.classifications.length > 1 ? "s" : ""
+					} (ordered by confidence):`;
+					resultContent.appendChild(classificationsHeader);
 
-                // Collapsible section for alternative results
-                if (data.classifications.length > 1) {
-                    const collapsibleId = 'alternatives-' + Date.now();
-                    
-                    const collapsibleHeader = document.createElement("div");
-                    collapsibleHeader.className = "collapsible-header";
-                    collapsibleHeader.onclick = () => toggleCollapsible(collapsibleId);
-                    collapsibleHeader.innerHTML = `
-                        <span style="font-weight: 600;">📋 Alternative Classifications (${data.classifications.length - 1})</span>
+					// Display TOP MATCH first
+					const topMatch = data.classifications[0];
+					const topCard = createClassificationCard(topMatch, 0);
+					resultContent.appendChild(topCard);
+
+					// Collapsible section for alternative results
+					if (data.classifications.length > 1) {
+						const collapsibleId = "alternatives-" + Date.now();
+
+						const collapsibleHeader = document.createElement("div");
+						collapsibleHeader.className = "collapsible-header";
+						collapsibleHeader.onclick = () => toggleCollapsible(collapsibleId);
+						collapsibleHeader.innerHTML = `
+                        <span style="font-weight: 600;">📋 Alternative Classifications (${
+													data.classifications.length - 1
+												})</span>
                         <svg class="chevron" id="chevron-${collapsibleId}" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     `;
-                    resultContent.appendChild(collapsibleHeader);
+						resultContent.appendChild(collapsibleHeader);
 
-                    const collapsibleContent = document.createElement("div");
-                    collapsibleContent.className = "collapsible-content";
-                    collapsibleContent.id = collapsibleId;
-                    
-                    // Add alternative classifications
-                    for (let i = 1; i < data.classifications.length; i++) {
-                        const altCard = createClassificationCard(data.classifications[i], i);
-                        collapsibleContent.appendChild(altCard);
-                    }
-                    
-                    resultContent.appendChild(collapsibleContent);
-                }
+						const collapsibleContent = document.createElement("div");
+						collapsibleContent.className = "collapsible-content";
+						collapsibleContent.id = collapsibleId;
 
-                // Generate Invoice ONCE for top match only
-                const invoiceContainer = generateInvoice(topMatch, data.visual_analysis);
-                resultContent.appendChild(invoiceContainer);
-            } else {
-                // Fallback for old format (single classification)
-                const hsCodeDiv = document.createElement("div");
-                hsCodeDiv.className = "hs-code-display";
-                hsCodeDiv.textContent = data.hs_code || "No classification found";
-                resultContent.appendChild(hsCodeDiv);
+						// Add alternative classifications
+						for (let i = 1; i < data.classifications.length; i++) {
+							const altCard = createClassificationCard(
+								data.classifications[i],
+								i
+							);
+							collapsibleContent.appendChild(altCard);
+						}
 
-                if (data.confidence_score !== undefined) {
-                    const confidenceDiv = document.createElement("div");
-                    confidenceDiv.className = "confidence-container result-item";
-                    const confidencePercent = Math.round(data.confidence_score * 100);
-                    confidenceDiv.innerHTML = `
+						resultContent.appendChild(collapsibleContent);
+					}
+
+					// Generate Invoice ONCE for top match only
+					const invoiceContainer = generateInvoice(
+						topMatch,
+						data.visual_analysis
+					);
+					resultContent.appendChild(invoiceContainer);
+				} else {
+					// Fallback for old format (single classification)
+					const hsCodeDiv = document.createElement("div");
+					hsCodeDiv.className = "hs-code-display";
+					hsCodeDiv.textContent = data.hs_code || "No classification found";
+					resultContent.appendChild(hsCodeDiv);
+
+					if (data.confidence_score !== undefined) {
+						const confidenceDiv = document.createElement("div");
+						confidenceDiv.className = "confidence-container result-item";
+						const confidencePercent = Math.round(data.confidence_score * 100);
+						confidenceDiv.innerHTML = `
                         <div class="confidence-label">
                             <span class="result-label">Confidence Score</span>
                             <span class="confidence-score">${confidencePercent}%</span>
@@ -1245,57 +2147,66 @@
                             <div class="confidence-fill" style="width: ${confidencePercent}%"></div>
                         </div>
                     `;
-                    resultContent.appendChild(confidenceDiv);
-                }
+						resultContent.appendChild(confidenceDiv);
+					}
 
-                if (data.product_description) {
-                    const descDiv = document.createElement("div");
-                    descDiv.className = "result-item";
-                    descDiv.innerHTML = `
+					if (data.product_description) {
+						const descDiv = document.createElement("div");
+						descDiv.className = "result-item";
+						descDiv.innerHTML = `
                         <div class="result-label">Product Description</div>
                         <div class="result-value">${data.product_description}</div>
                     `;
-                    resultContent.appendChild(descDiv);
-                }
+						resultContent.appendChild(descDiv);
+					}
 
-                if (data.reasoning) {
-                    const reasonDiv = document.createElement("div");
-                    reasonDiv.className = "result-item";
-                    reasonDiv.innerHTML = `
+					if (data.reasoning) {
+						const reasonDiv = document.createElement("div");
+						reasonDiv.className = "result-item";
+						reasonDiv.innerHTML = `
                         <div class="result-label">Classification Reasoning</div>
                         <div class="result-value">${data.reasoning}</div>
                     `;
-                    resultContent.appendChild(reasonDiv);
-                }
+						resultContent.appendChild(reasonDiv);
+					}
 
-                if (data.key_characteristics && data.key_characteristics.length > 0) {
-                    const charDiv = document.createElement("div");
-                    charDiv.className = "result-item";
-                    charDiv.innerHTML = `
+					if (data.key_characteristics && data.key_characteristics.length > 0) {
+						const charDiv = document.createElement("div");
+						charDiv.className = "result-item";
+						charDiv.innerHTML = `
                         <div class="result-label">Key Characteristics</div>
                         <div style="margin-top: 0.75rem;">
-                            ${data.key_characteristics.map(char => `<span class="characteristic-tag">${char}</span>`).join('')}
+                            ${data.key_characteristics
+															.map(
+																(char) =>
+																	`<span class="characteristic-tag">${char}</span>`
+															)
+															.join("")}
                         </div>
                     `;
-                    resultContent.appendChild(charDiv);
-                }
-            }
-        }
+						resultContent.appendChild(charDiv);
+					}
+				}
+			}
 
-        function displayError(error, rawResponse) {
-            const resultContent = document.getElementById("resultContent");
-            resultContent.innerHTML = "";
-            document.getElementById("results").style.display = "block";
+			function displayError(error, rawResponse) {
+				const resultContent = document.getElementById("resultContent");
+				resultContent.innerHTML = "";
+				document.getElementById("results").style.display = "block";
 
-            const errorDiv = document.createElement("div");
-            errorDiv.className = "error";
-            errorDiv.innerHTML = `
+				const errorDiv = document.createElement("div");
+				errorDiv.className = "error";
+				errorDiv.innerHTML = `
                 <h4 style="margin-bottom: 1rem;">❌ Classification Error</h4>
                 <p style="margin-bottom: 0.5rem;">${error}</p>
-                ${rawResponse ? `<details style="margin-top: 1rem;"><summary style="cursor: pointer;">View raw response</summary><pre style="margin-top: 0.5rem; font-size: 0.85rem; overflow: auto;">${rawResponse}</pre></details>` : ''}
+                ${
+									rawResponse
+										? `<details style="margin-top: 1rem;"><summary style="cursor: pointer;">View raw response</summary><pre style="margin-top: 0.5rem; font-size: 0.85rem; overflow: auto;">${rawResponse}</pre></details>`
+										: ""
+								}
             `;
-            resultContent.appendChild(errorDiv);
-        }
-    </script>
-</body>
+				resultContent.appendChild(errorDiv);
+			}
+		</script>
+	</body>
 </html>
