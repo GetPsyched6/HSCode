@@ -42,6 +42,106 @@ class WatsonxHSCodeClassifier:
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode("utf-8")
 
+    def _apply_smart_hs_matching(self, ai_result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Apply Python-level logic to match HS codes based on AI's visual analysis.
+        This overrides obviously wrong AI decisions.
+        """
+        try:
+            # Extract visual characteristics from AI
+            visual_analysis = ai_result.get("visual_analysis", {})
+            color = visual_analysis.get("color", "").lower()
+            processing_state = visual_analysis.get("processing_state_observed", "").lower()
+            
+            # Get AI's classification attempt
+            classifications = ai_result.get("classifications", [])
+            if not classifications:
+                return ai_result
+            
+            # Check each classification
+            for classification in classifications:
+                hs_code = classification.get("hs_code", "")
+                description = classification.get("article_description", "").lower()
+                
+                # FIRST: Check if AI embedded suffix in hs_code (e.g., "0901.21.00.65")
+                # We need hs_code to ONLY be 3 parts, suffix goes in stat_suffix
+                parts = hs_code.split(".")
+                if len(parts) >= 4 and parts[3].isdigit():
+                    # AI included suffix in hs_code - extract it!
+                    extracted_suffix = parts[3]
+                    base_hs_code = ".".join(parts[:3])
+                    classification["hs_code"] = base_hs_code
+                    # Only set stat_suffix if it's empty or not already numeric
+                    if not classification.get("stat_suffix", "").replace(".", "").isdigit():
+                        classification["stat_suffix"] = extracted_suffix
+                    print(f"⚠️  AI embedded suffix in HS code - extracted {extracted_suffix}, base code: {base_hs_code}")
+                    hs_code = base_hs_code  # Update for further processing
+                
+                # CRITICAL VALIDATION: Check for obvious mismatches
+                is_dark_color = any(word in color for word in ["brown", "black", "dark", "dried", "charred"])
+                is_light_color = any(word in color for word in ["green", "light", "pale", "fresh", "raw", "white"])
+                
+                is_processed_visual = any(word in processing_state for word in ["processed", "roasted", "cooked", "dried", "fermented"])
+                is_unprocessed_visual = any(word in processing_state for word in ["unprocessed", "raw", "fresh", "not roasted", "not fermented"])
+                
+                # Check if HS code description contradicts visual observation
+                has_processed_code = any(word in description for word in ["roasted", "processed", "cooked", "fermented", "dried"])
+                has_unprocessed_code = any(word in description for word in ["not roasted", "not processed", "not fermented", "raw", "fresh"])
+                
+                # OVERRIDE LOGIC: If color/processing says one thing but code says another
+                if (is_dark_color or is_processed_visual) and has_unprocessed_code:
+                    print(f"🔧 PYTHON OVERRIDE: Visual analysis shows processed/dark ({color}, {processing_state}) but AI picked 'not roasted/processed' code. Looking for correct code...")
+                    
+                    # Try to find the correct "roasted/processed" version of this code
+                    if "0901.11" in hs_code:  # Not roasted coffee
+                        # Switch to roasted version
+                        # IMPORTANT: When changing category, we MUST use the default "Other" suffix for the NEW category
+                        # Suffixes are category-specific! Don't copy suffix from "not roasted" to "roasted"
+                        classification["hs_code"] = "0901.21.00"
+                        classification["stat_suffix"] = "49"  # Default "Other: Other" for roasted category
+                        classification["article_description"] = "Coffee, roasted: Not decaffeinated: In retail containers weighing 2 kg or less: Other: Other"
+                        print(f"   → Corrected to 0901.21.00 with suffix 49 (roasted, Other: Other)")
+                        
+                        # Update reasoning
+                        classification["reasoning"] = f"The product exhibits a dark brown color and processed appearance, indicating it has been roasted. The packaging does not display organic certification marks or specific variety text, so the general Other suffix is applied within the roasted coffee category. (AI guidance corrected by system validation)"
+                        
+                        # VALIDATE & FIX product_description too
+                        prod_desc = classification.get("product_description", "").lower()
+                        if any(word in prod_desc for word in ["unprocessed", "not roasted", "raw", "green"]):
+                            # Product description contradicts the corrected state
+                            classification["product_description"] = classification.get("product_description", "").replace("unprocessed", "processed").replace("not roasted", "roasted").replace("raw", "roasted").replace("green", "dark brown roasted")
+                            print(f"   → Also corrected product_description to match roasted state")
+                
+                elif (is_light_color or is_unprocessed_visual) and has_processed_code:
+                    print(f"🔧 PYTHON OVERRIDE: Visual analysis shows unprocessed/light ({color}, {processing_state}) but AI picked 'roasted/processed' code. Looking for correct code...")
+                    
+                    # Try to find the correct "not roasted/processed" version
+                    if "0901.21" in hs_code:  # Roasted coffee
+                        # Switch to not roasted version
+                        # IMPORTANT: When changing category, we MUST use the default "Other" suffix for the NEW category
+                        # Suffixes are category-specific! Don't copy suffix from "roasted" to "not roasted"
+                        classification["hs_code"] = "0901.11.00"
+                        classification["stat_suffix"] = "65"  # Default "Other: Other" for not roasted category
+                        classification["article_description"] = "Coffee, not roasted: Not decaffeinated: Other: Other"
+                        print(f"   → Corrected to 0901.11.00 with suffix 65 (not roasted, Other: Other)")
+                        
+                        # VALIDATE & FIX product_description too
+                        prod_desc = classification.get("product_description", "").lower()
+                        if any(word in prod_desc for word in ["processed", "roasted", "cooked", "dried", "dark"]):
+                            # Product description contradicts the corrected state
+                            classification["product_description"] = classification.get("product_description", "").replace("processed", "unprocessed").replace("roasted", "not roasted").replace("cooked", "raw").replace("dark brown", "light green")
+                            print(f"   → Also corrected product_description to match not roasted state")
+                        
+                        # Update reasoning
+                        classification["reasoning"] = f"The product exhibits a light/green color and unprocessed appearance, indicating it is not roasted. The packaging does not display organic certification marks or specific variety text, so the general Other suffix is applied within the not roasted category. (AI guidance corrected by system validation)"
+            
+            return ai_result
+            
+        except Exception as e:
+            print(f"⚠️ Error in smart HS matching: {e}")
+            # Return original result if validation fails
+            return ai_result
+
     def classify_hs_code(self, image_path: str, retry_count: int = 0, max_retries: int = 2) -> Dict[str, Any]:
         """Classify product image to HS code using Watsonx Vision API
         
@@ -76,6 +176,30 @@ HS CODE REFERENCE DOCUMENT:
 
 **CLASSIFICATION PROCESS - YOU MUST FOLLOW IN ORDER:**
 
+⚠️⚠️⚠️ CRITICAL TWO-STEP PROCESS - THESE ARE SEPARATE ⚠️⚠️⚠️
+
+STEP A: VISUAL APPEARANCE → MAIN CODE CATEGORY (FIRST 4-6 DIGITS)
+Look at COLOR and PHYSICAL STATE only:
+• Brown/black/dried/cooked → Pick codes starting with "roasted"/"processed"/"fermented"
+• Light/green/pale/fresh/raw → Pick codes starting with "not roasted"/"raw"/"unprocessed"
+
+STEP B: LABEL TEXT → SUFFIX (LAST 2 DIGITS)
+Look at text/marks on packaging:
+• Found "ORGANIC" text or seal → Use "Certified organic" suffix
+• Found specific variety text → Use that variety's suffix  
+• No special text found → Use "Other" suffix
+
+DO NOT CONFUSE THESE STEPS:
+❌ WRONG: "No label text, so I'll use 'not roasted'" 
+✅ CORRECT: "Dark color = roasted code. No variety text = Other suffix."
+
+VISUAL EXAMPLES (STEP A determines main code):
+• Dark brown beans → "roasted" code | Light green beans → "not roasted" code
+• Black tea leaves → "fermented" code | Green tea leaves → "not fermented" code  
+• Dried fruit (dark/shriveled) → "dried" code | Fresh fruit (bright) → "fresh" code
+• Cooked vegetables (dark) → "cooked/prepared" code | Raw vegetables (bright) → "raw" code
+Then STEP B uses label text for suffix within that category.
+
 ═══════════════════════════════════════════════════════════════════════
 PHASE 1: LABEL TEXT EXTRACTION (Complete this FIRST - MANDATORY)
 ═══════════════════════════════════════════════════════════════════════
@@ -85,7 +209,7 @@ Before making ANY classification decisions, you must extract information from th
 1. **Read ALL visible text** on the product label/packaging (brand names, product names, descriptions, weight, etc.)
 2. **Identify certification seals/logos** - Look for actual certification marks (USDA Organic seal, Fair Trade logo, certification body logos)
 3. **List regulatory marks** - Any certification numbers, approval codes, or regulatory stamps
-4. **Extract qualifier keywords** - Words that indicate specific product attributes: ORGANIC, CERTIFIED, DECAF, DECAFFEINATED, ARABICA, ROBUSTA, FLAVORED, etc.
+4. **Extract qualifier keywords** - Words that indicate specific product attributes: ORGANIC, CERTIFIED, specific varieties or grades, processing methods (DECAF, FLAVORED), material types, etc.
 
 **CRITICAL RULES for label_text_extraction:**
 - "visible_text": List EVERY word/phrase you can actually read on the packaging
@@ -99,9 +223,9 @@ Before making ANY classification decisions, you must extract information from th
 - "regulatory_marks": List any certification numbers or approval codes visible
 
 **EXAMPLE of correct extraction:**
-- Packaging with floral design but no certification text → certification_marks: [], qualifier_keywords: []
+- Packaging with decorative design but no certification text → certification_marks: [], qualifier_keywords: []
 - Packaging with "USDA Organic" seal visible → certification_marks: ["USDA Organic seal"], qualifier_keywords: ["ORGANIC"]
-- Packaging with "100% Arabica" text → qualifier_keywords: ["ARABICA", "100% ARABICA"]
+- Packaging with specific variety/grade text → qualifier_keywords: ["<variety name>", "<grade>"]
 
 ═══════════════════════════════════════════════════════════════════════
 PHASE 2: HS CODE SELECTION (Use ONLY Phase 1 results)
@@ -112,9 +236,15 @@ Now classify using ONLY the text/marks you extracted in Phase 1.
 **CRITICAL ANALYSIS REQUIREMENTS:**
 
 1. **VISUAL INSPECTION** - Look carefully at EVERY detail:
-   - Color, shade, and tone of the product
+   - Color, shade, and tone of the product (BE PRECISE - dark brown vs light brown vs green vs white, etc.)
    - Physical state (whole, ground, powder, leaves, liquid, solid)
-   - Processing indicators (roasting, fermentation, drying, cooking, etc.)
+   - Processing indicators - Base ONLY on visible evidence:
+     * Dark brown/black/charred appearance → roasted/cooked/processed
+     * Light/pale/green/raw appearance → unprocessed/raw/unroasted
+     * Dried, shriveled, or desiccated texture → dried/dehydrated
+     * Fermented, bloated, or cultured appearance → fermented
+     * Ground/powdered form → processed/milled
+     * DO NOT contradict what you visually observe - if it looks processed, it IS processed
    - Packaging (retail containers, bulk, bags, boxes, labels)
    - Size, shape, texture, and physical characteristics
 
@@ -125,38 +255,61 @@ Now classify using ONLY the text/marks you extracted in Phase 1.
    - Special attributes (ONLY if confirmed in Phase 1 extraction)
    - Packaging type, size, and retail/bulk format
 
-3. **HS CODE MATCHING** - Match against the document:
-   - Find ALL codes that could reasonably apply
-   - Rank by confidence based on visual evidence
-   - Consider edge cases and borderline classifications
-   - Pay close attention to processing distinctions in the HS document
-   - Match specific characteristics (organic, flavored, packaging size, etc.)
+3. **HS CODE MATCHING** - Use the document systematically:
+   
+   **STEP 1: Understand HS Code Structure**
+   HS codes are HIERARCHICAL. Read descriptions left-to-right:
+   - BEGINNING of description = Major category (processing state, product type, fermentation)
+   - MIDDLE of description = Physical characteristics (packaging, form, size)
+   - END of description = Specific qualifiers (varieties, certifications)
+   
+   **STEP 2: Match by VISUAL Attributes First**
+   Filter codes by what you can SEE:
+   
+   VISUAL ATTRIBUTES (observable, no label text needed):
+   - Processing state: "roasted" vs "not roasted", "fermented" vs "not fermented", "cooked" vs "raw"
+   - Physical form: whole/ground/powder/liquid
+   - Color: brown/green/white/black (indicates processing)
+   - Packaging: bulk/retail containers, size visible
+   - Texture: dried/fresh, whole/milled
+   
+   → If you SEE a processed state → ONLY consider codes that say that state in the description
+   → If you SEE an unprocessed state → ONLY consider codes that say that state in the description
+   → Visual evidence IS proof - match it to the beginning/middle of HS descriptions
+   
+   **STEP 3: Match by LABEL Attributes**
+   For codes with qualifiers at the END of descriptions:
+   
+   LABEL-DEPENDENT ATTRIBUTES (not observable, need text/marks):
+   - Certifications: "Certified organic", "Fair trade"
+   - Specific varieties: named varieties, grades, species
+   - Decaffeinated status
+   - Flavoring (when not visually obvious)
+   
+   → ONLY use specific qualifier codes if you found explicit text/marks in Phase 1
+   → Otherwise use "Other" suffix
+   
+   Acceptable evidence:
+   * Explicit text on label
+   * Official certification seals/logos
+   * Regulatory marks
+   
+   NOT acceptable:
+   * Decorative imagery
+   * Package color
+   * Assumptions
+   
+   **STEP 4: MANDATORY VALIDATION**
+   Before finalizing, re-read your selected code's FULL description:
+   - Does the BEGINNING match what you SEE? (processing state)
+   - Does the MIDDLE match what you SEE? (packaging, form)
+   - Does the END match what the LABEL says? (qualifiers)
+   → If ANY part doesn't match, select a different code
 
    **EVIDENCE-BASED CLASSIFICATION HIERARCHY:**
-   When multiple codes differ by a SPECIFIC QUALIFIER (e.g., "certified organic" vs "other", "decaffeinated" vs "not decaffeinated", specific variety vs general):
+   When multiple codes differ by qualifiers:
    
-   a) IDENTIFY THE DISTINGUISHER: What attribute makes one code different from another?
-      - Certification status (organic, fair trade, etc.)
-      - Processing method (decaffeinated, fermented, roasted, etc.)
-      - Material/variety type (Arabica vs Robusta, cotton vs polyester, etc.)
-      - Special characteristics (flavored, grade, quality designation, etc.)
-   
-   b) REQUIRE VISUAL EVIDENCE (verified in Phase 1):
-      - Only use SPECIFIC codes if you can SEE proof of the distinguishing attribute
-      - Acceptable evidence:
-        * Explicit text stating the attribute ("CERTIFIED ORGANIC", "DECAFFEINATED", "100% COTTON")
-        * Official certification seals/logos (USDA Organic seal, Fair Trade logo, etc.)
-        * Regulatory marks or certification numbers
-        * Unambiguous physical differences that ONLY occur in the specific variant
-      - NOT acceptable evidence:
-        * Decorative elements (flowers, leaves, natural imagery) ≠ certification
-        * Color schemes (green packaging ≠ organic)
-        * Artistic design choices or marketing aesthetics
-        * Assumptions like "looks premium so probably certified"
-        * Inferences like "has natural imagery so must be organic"
-        * "Possibly", "likely", "suggests", "indicates" reasoning
-   
-   c) MANDATORY VALIDATION RULE - Cross-check with Phase 1:
+   a) MANDATORY VALIDATION RULE - Cross-check with Phase 1:
       For codes with qualifiers (organic, decaf, specific variety), you MUST verify:
       
       ** To use "Certified organic" suffix codes:
@@ -219,7 +372,7 @@ Now classify using ONLY the text/marks you extracted in Phase 1.
     ],
     "qualifier_keywords": [
       "List ONLY explicit qualifier words READ on the label",
-      "Examples: 'ORGANIC', 'CERTIFIED', 'DECAF', 'ARABICA', 'ROBUSTA', 'FLAVORED'",
+      "Examples: 'ORGANIC', 'CERTIFIED', specific varieties, grades, processing methods",
       "Do NOT infer from colors/imagery",
       "If NO qualifier text → empty array []"
     ]
@@ -230,7 +383,7 @@ Now classify using ONLY the text/marks you extracted in Phase 1.
       "stat_suffix": "statistical suffix if applicable",
       "article_description": "exact description from HS document",
       "product_description": "what you see in this specific image",
-      "reasoning": "detailed explanation that MUST reference label_text_extraction. State: (1) What text/marks found in Phase 1, (2) Which qualifiers are present/absent in label_text_extraction, (3) Why you selected this specific code suffix based on extracted text. Example: 'Based on label_text_extraction, found visible_text: [Bonhomia, Nirvana, Premium...] but certification_marks: [] and qualifier_keywords: []. Since NO ORGANIC text or certification found in Phase 1, using suffix 20 (Other) instead of 15 (Certified organic).'",
+      "reasoning": "CRITICAL: Write ONLY in natural, professional English for customs officers - NO TECHNICAL NOTATION ALLOWED. Do NOT use: 'Phase 1', 'visible_text', 'certification_marks', 'qualifier_keywords', '[]', or any JSON field names. Use TWO-STEP logic: (1) Visual appearance determines MAIN CODE (processed vs unprocessed), (2) Label text determines SUFFIX (specific vs Other). Example: 'The product exhibits a dark brown, processed appearance, placing it in the processed/roasted category. The packaging does not display organic certification or specific variety designations, so the general Other suffix is applied within that category.'",
       "confidence_score": 0.0 to 1.0,
       "key_characteristics": [
         "list of observed characteristics that support this classification"
@@ -239,32 +392,37 @@ Now classify using ONLY the text/marks you extracted in Phase 1.
   ],
   "visual_analysis": {{
     "product_type": "primary product category",
-    "color": "exact color/shade observed",
-    "processing_state": "processing or preparation state",
+    "color": "exact color/shade observed (be specific: dark brown, light green, white, black, etc.)",
+    "processing_state_observed": "CRITICAL: Base ONLY on appearance. Dark/dried/cooked = processed. Light/fresh/raw = unprocessed. This determines MAIN CODE, NOT suffix.",
     "packaging": "packaging description if visible",
     "decorative_elements": "describe any decorative imagery (flowers, leaves, patterns) - separate from certifications",
-    "label_text_summary": "brief summary referencing what was found/not found in label_text_extraction"
+    "label_text_summary": "brief summary referencing what was found/not found in label_text_extraction",
+    "two_step_validation": "MANDATORY: (A) If color is dark/brown/black, MAIN HS code MUST start with 'roasted'/'processed'/'fermented'. (B) Suffix is determined by label text, NOT by visual appearance. State both validations."
   }},
   "not_in_document": false
 }}
 
-**EXAMPLE - Nirvana Coffee with floral design but NO certification:**
+**EXAMPLE STRUCTURE - Processed product with no qualifier text:**
 {{
   "label_text_extraction": {{
-    "visible_text": ["Bonhomia", "Gourmet Coffees & Teas", "NIRVANA", "Premium", "Speciality Coffee Blend", "Medium-Dark", "200g"],
-    "certification_marks": [],  // No USDA Organic or other certification seals visible
+    "visible_text": ["<brand name>", "<weight/size>"],
+    "certification_marks": [],  // No certification seals visible
     "regulatory_marks": [],
-    "qualifier_keywords": []  // No ORGANIC, DECAF, or ARABICA text visible
+    "qualifier_keywords": []  // No qualifier keywords found on label
   }},
   "classifications": [
     {{
-      "hs_code": "0901.21.00",
-      "stat_suffix": "20",  // Using "Other" because no certification in Phase 1
-      "article_description": "Coffee, roasted: Not decaffeinated: In retail containers weighing 2 kg or less: Arabica: Other",
-      "reasoning": "Phase 1 extraction shows visible_text includes product names but certification_marks: [] and qualifier_keywords: []. Despite decorative floral imagery on packaging, NO 'CERTIFIED ORGANIC' text or USDA seal found. NO 'ARABICA' text found on label. Therefore using suffix 20 (Other) instead of 15 (Certified organic). Roasted state confirmed by brown beans visible.",
-      "confidence_score": 0.85
+      "hs_code": "<PROCESSED_CATEGORY_CODE>",  // STEP A: Visual state = processed → use processed category code
+      "stat_suffix": "<OTHER_SUFFIX>",  // STEP B: No label qualifiers → use Other suffix
+      "article_description": "<exact description from HS document>",
+      "reasoning": "The product exhibits a dark, processed appearance, placing it in the processed/roasted category. The packaging does not display certification marks or specific variety text, so the general Other suffix is applied within that category.",
+      "confidence_score": <0.0-1.0 based on evidence strength>
     }}
-  ]
+  ],
+  "visual_analysis": {{
+    "processing_state_observed": "Processed (dark color, dried appearance)",
+    "two_step_validation": "STEP A VALIDATED: Dark color → processed category code selected. STEP B VALIDATED: No label qualifiers → Other suffix applied."
+  }}
 }}
 
 **IF PRODUCT NOT IN DOCUMENT:**
@@ -279,11 +437,11 @@ Now classify using ONLY the text/marks you extracted in Phase 1.
 
 1. **Structure:** Start with label_text_extraction, then classifications, then visual_analysis
 2. **Text Extraction First:** Complete Phase 1 extraction before any classification
-3. **Validation:** Every classification MUST cross-reference label_text_extraction in the reasoning
+3. **Validation:** Every classification MUST reference what was found (or not found) on the label in natural language
 4. **Qualifier Codes:** To use ANY code with qualifiers (organic, decaf, variety):
-   - The qualifier MUST appear in label_text_extraction.qualifier_keywords OR certification_marks
-   - If NOT in extraction → use general/"Other" code
-   - Reasoning MUST explain: "qualifier_keywords: [] so using suffix 20 not 15"
+   - The qualifier MUST appear in the extracted text or as a visible certification
+   - If NOT found → use general/"Other" code
+   - Reasoning MUST explain in plain language: "No organic certification text visible, therefore using the general classification"
 5. **No Assumptions:** Decorative imagery (leaves, flowers, natural scenes) is NOT proof of certification
 6. **Confidence:** Be HARSH with scores - Phase 1 confirmation required for high confidence on specific codes
 7. **Format:** 
@@ -295,8 +453,11 @@ Now classify using ONLY the text/marks you extracted in Phase 1.
 
 **REMEMBER:** 
 - Phase 1 FIRST: Extract text → Then Phase 2: Classify
-- Empty qualifier_keywords and certification_marks → use "Other" suffix codes
-- Reasoning must reference what was/wasn't found in label_text_extraction
+- No qualifiers or certifications found → use "Other" suffix codes
+- CRITICAL: In the "reasoning" field, write ONLY natural English - NEVER use technical terms like 'Phase 1', 'visible_text', 'certification_marks', 'qualifier_keywords', or '[]'
+- Write as if explaining to a customs officer who doesn't know JSON or programming
+- Example good reasoning: "The packaging shows brand names but no organic certifications. Therefore, the general code is used."
+- Example BAD reasoning: "Phase 1 extraction shows visible_text: [] and certification_marks: []" ← DO NOT DO THIS
 
 Begin your response with {{ now:
 {{"""
@@ -327,9 +488,9 @@ Begin your response with {{ now:
                 ],
                 "parameters": {
                     "decoding_method": "greedy",
-                    "max_new_tokens": 1500,
+                    "max_new_tokens": 3000,
                     "temperature": 0.0,
-                    "top_p": 0.9,
+                    "min_new_tokens": 100,
                 },
                 "project_id": self.project_id,
             }
@@ -483,6 +644,9 @@ Begin your response with {{ now:
                     if json_str.startswith("{") and json_str.endswith("}"):
                         parsed_result = json.loads(json_str)
                         print(f"✓ Successfully parsed JSON response")
+                        
+                        # POST-PROCESS: Apply Python-level HS code matching
+                        parsed_result = self._apply_smart_hs_matching(parsed_result)
 
                         return {
                             "success": True,
